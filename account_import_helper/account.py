@@ -9,8 +9,6 @@ import logging
 import unicodecsv
 logger = logging.getLogger(__name__)
 
-OUTFILE = '/tmp/account.account.csv'
-
 
 class AccountChartTemplate(models.Model):
     _inherit = 'account.chart.template'
@@ -28,7 +26,8 @@ class AccountChartTemplate(models.Model):
 
     @api.multi
     def generate_custom_chart(
-            self, custom_chart, module, account_xmlid_prefix):
+            self, custom_chart, module, account_xmlid_prefix,
+            csv_out_file='/tmp/account.account.csv'):
         self.ensure_one()
         aato = self.env['account.account.template']
         user_type_id2xmlid = self.generate_id2xmlid('account.account.type')
@@ -87,11 +86,11 @@ class AccountChartTemplate(models.Model):
                 size -= 1
             if not match:
                 raise UserError(_(
-                    "Customer account %s didn't match any Odoo account")
-                    % custom_code)
+                    "Customer account %s '%s' didn't match any Odoo account")
+                    % (custom_code, src_custom_dict.get('name')))
 
         # generate file
-        f = open(OUTFILE, 'w')  # it will over-write an existing file
+        f = open(csv_out_file, 'w')  # it will over-write an existing file
         w = unicodecsv.DictWriter(f, [
             'id',
             'code',
@@ -104,10 +103,12 @@ class AccountChartTemplate(models.Model):
         for account_dict in res:
             w.writerow(account_dict)
         f.close()
-        return OUTFILE
+        logger.info('File %s successfully generated', csv_out_file)
+        return
 
     @api.model
-    def generate_l10n_fr_custom(self, custom_fr_pcg):
+    def generate_l10n_fr_custom(
+            self, custom_fr_pcg, module='customer_specific'):
         # This is a sample method
         # custom_fr_pcg is a list of tuple:
         # (code, {'name': 'Déplacement', 'note': 'My comment'}:
@@ -124,4 +125,4 @@ class AccountChartTemplate(models.Model):
                 'missing account name'
             assert code.isdigit(), 'code should only have digits'
         company.chart_template_id.generate_custom_chart(
-            custom_fr_pcg, 'emaj_custom', 'pcg_')
+            custom_fr_pcg, module, 'pcg_')
