@@ -23,13 +23,13 @@ Then, in the future production database, after the installation of the official 
 
 UPDATE account_tax SET account_id=null, refund_account_id=null;
 
-UPDATE ir_property SET value_reference=null WHERE value_reference like 'account.account,%’;
+UPDATE ir_property SET value_reference=null WHERE value_reference like 'account.account,%';
 
 * Delete all accounts:
 
 DELETE FROM account_account WHERE 1=1;
 
-* Go to the menu *Accounting > Adviser > Chart of accounts* and import the file *account.account.csv* ; enable the option *Show all fields for computation* (so that the *Type* is imported)
+* Go to the menu *Accounting > Adviser > Chart of accounts* and import the file *account.account.csv* (DEPRECATED: enable the option *Show all fields for computation*, so that the columns *user_type_id/id* and *tax_ids/id* are mapped to the right fields *Type / External ID* and *Default Taxes / External ID*)
 
 * In the menu *Accounting > Configuration > Accounting > Taxes*, on each tax, configure the *Tax Account* and *Tax Account on Refunds*.
 
