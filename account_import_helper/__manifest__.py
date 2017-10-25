@@ -35,6 +35,8 @@ DELETE FROM account_account WHERE 1=1;
 
 * In the menu *Accounting > Configuration > Accounting > Fiscal Positions*, on each fiscal position, configure the account mapping.
 
+* In the menu *Accounting > Configuration > Accounting > Journals*, on earch journal, configure the default debit account and the default credit account.
+
 * On the page *Accounting > Configuration > Settings*, configure the *Inter-Banks Transfer Account*
 
 * In the menu *Settings > Technical > Parameters > Company Properties*, edit the 4 properties
@@ -51,5 +53,6 @@ This module has been written by Alexis de Lattre <alexis.delattre@akretion.com> 
     'author': 'Akretion',
     'website': 'http://www.akretion.com',
     'depends': ['account'],
+    'data': ['wizard/account_chart_generate_view.xml'],
     'installable': True,
 }

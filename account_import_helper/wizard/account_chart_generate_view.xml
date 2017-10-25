@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  © 2017 Akretion (Alexis de Lattre <alexis.delattre@akretion.com>)
+  License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+-->
+
+<odoo>
+
+
+<record id="account_chart_generate_form" model="ir.ui.view">
+    <field name="name">account.chart.generate_form</field>
+    <field name="model">account.chart.generate</field>
+    <field name="arch" type="xml">
+        <form string="Generate chart of account">
+            <div name="help">
+                <p>Input CSV file must be in UTF-8 with 3 columns (code, name and description) without header line.</p>
+                <p>The result CSV file is written to /tmp/account.account.csv</p>
+            </div>
+            <group name="main">
+                <field name="module"/>
+                <field name="fixed_size_code"/>
+                <field name="with_taxes"/>
+                <field name="csv_file" string="CSV file"/>
+            </group>
+            <footer>
+                <button name="run" type="object" string="Generate" class="btn-primary"/>
+                <button special="cancel" string="Cancel" class="oe_link"/>
+            </footer>
+        </form>
+    </field>
+</record>
+
+<record id="account_chart_generate_action" model="ir.actions.act_window">
+    <field name="name">Chart Generate</field>
+    <field name="res_model">account.chart.generate</field>
+    <field name="view_mode">form</field>
+    <field name="target">new</field>
+</record>
+
+<menuitem id="account_chart_generate_parent_menu" parent="base.menu_custom" name="Chart Generate"/>
+
+<menuitem id="account_chart_generate_menu" parent="account_chart_generate_parent_menu" action="account_chart_generate_action" />
+
+
+</odoo>

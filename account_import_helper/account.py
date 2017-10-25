@@ -28,7 +28,10 @@ class AccountChartTemplate(models.Model):
     def generate_custom_chart(
             self, custom_chart, module='custom',
             account_xmlid_prefix='account_',
-            csv_out_file='/tmp/account.account.csv'):
+            csv_out_file='/tmp/account.account.csv',
+            fixed_size_code=True,
+            custom2odoo_code_map=None,
+            with_taxes=True):
         # arg 'custom_chart': list of tuple
         # tuple: ('622600', {'name': 'Honoraires comptables'})
         # in the second value of the tuple, we often only put name,
@@ -68,30 +71,38 @@ class AccountChartTemplate(models.Model):
         })
         custom_code_size = False
         for (custom_code, src_custom_dict) in custom_chart:
-            if custom_code_size:
-                if len(custom_code) != custom_code_size:
-                    raise UserError(_(
-                        "For account code %s, the size (%d) is different from "
-                        "the size of other accounts (%d)") % (
-                        custom_code, len(custom_code), custom_code_size))
+            if fixed_size_code:
+                if custom_code_size:
+                    if len(custom_code) != custom_code_size:
+                        raise UserError(_(
+                            "For account code %s, the size (%d) is different "
+                            "from the size of other accounts (%d)") % (
+                            custom_code, len(custom_code), custom_code_size))
+                else:
+                    custom_code_size = len(custom_code)
+                    if custom_code_size < odoo_code_size:
+                        raise UserError(_(
+                            "For account code %s, the custom code size (%d) "
+                            "is < odoo's code size (%d)") % (
+                            custom_code, custom_code_size, odoo_code_size))
+                size = odoo_code_size
             else:
-                custom_code_size = len(custom_code)
-                if custom_code_size < odoo_code_size:
-                    raise UserError(_(
-                        "For account code %s, the custom code size (%d) is < "
-                        "odoo's code size (%d)") % (
-                        custom_code, custom_code_size, odoo_code_size))
-            size = odoo_code_size
+                size = len(custom_code)
             match = False
+            matching_code = custom_code
+            if custom2odoo_code_map and custom_code in custom2odoo_code_map:
+                matching_code = custom2odoo_code_map[custom_code]
             while size > 1 and not match:
-                short_custom_code = custom_code[:size]
+                short_matching_code = matching_code[:size]
                 for odoo_code, odoo_dict in odoo_chart.iteritems():
-                    if odoo_code.startswith(short_custom_code):
+                    if odoo_code.startswith(short_matching_code):
                         custom_dict = odoo_dict.copy()
                         custom_dict['id'] = '%s.%s%s' % (
                             module, account_xmlid_prefix, custom_code)
                         custom_dict.update(src_custom_dict)
                         custom_dict['code'] = custom_code
+                        if not with_taxes:
+                            custom_dict['tax_xmlids'] = ''
                         res.append(custom_dict)
                         match = True
                         break
@@ -121,24 +132,29 @@ class AccountChartTemplate(models.Model):
     @api.model
     def generate_l10n_fr_custom(
             self, custom_fr_pcg, module='customer_specific',
-            csv_out_file='/tmp/account.account.csv'):
+            csv_out_file='/tmp/account.account.csv',
+            fixed_size_code=True, custom2odoo_code_map=None,
+            with_taxes=True):
         # This is a sample method
         # custom_fr_pcg is a list of tuple:
-        # (code, {'name': 'Déplacement', 'note': 'My comment'}:
+        # (code, {'name': 'Déplacement', 'note': 'My comment'})
         fr_pcg = self.env.ref('l10n_fr.l10n_fr_pcg_chart_template')
         company = self.env.user.company_id
         if company.chart_template_id != fr_pcg:
             raise UserError(_(
                 'The chart of accounts of the company %s is not the chart of '
                 'account of the official Odoo module l10n_fr') % company.name)
-        assert isinstance(custom_fr_pcg, list), 'custom_fr_pcg must be a dict'
+        assert isinstance(custom_fr_pcg, list), 'custom_fr_pcg must be a list'
         for (code, acc_dict) in custom_fr_pcg:
             assert len(code) > 3, 'account code is too small ?'
             assert isinstance(acc_dict.get('name'), (str, unicode)),\
                 'missing account name'
-            if not code.isdigit():
+            if not code[:3].isdigit():
                 raise UserError(
-                    _("Account '%s' contains caracters other than digits")
+                    _("Account '%s': the 3 first caracters are not digits")
                     % code)
         company.chart_template_id.generate_custom_chart(
-            custom_fr_pcg, module=module, csv_out_file=csv_out_file)
+            custom_fr_pcg, module=module, csv_out_file=csv_out_file,
+            fixed_size_code=fixed_size_code,
+            custom2odoo_code_map=custom2odoo_code_map,
+            with_taxes=with_taxes)
