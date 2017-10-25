@@ -27,7 +27,7 @@ class AccountChartTemplate(models.Model):
     @api.multi
     def generate_custom_chart(
             self, custom_chart, module='custom',
-            account_xmlid_prefix='account_',
+            xmlid_prefix='account_',
             csv_out_file='/tmp/account.account.csv',
             fixed_size_code=True,
             custom2odoo_code_map=None,
@@ -98,7 +98,7 @@ class AccountChartTemplate(models.Model):
                     if odoo_code.startswith(short_matching_code):
                         custom_dict = odoo_dict.copy()
                         custom_dict['id'] = '%s.%s%s' % (
-                            module, account_xmlid_prefix, custom_code)
+                            module, xmlid_prefix, custom_code)
                         custom_dict.update(src_custom_dict)
                         custom_dict['code'] = custom_code
                         if not with_taxes:
@@ -132,6 +132,7 @@ class AccountChartTemplate(models.Model):
     @api.model
     def generate_l10n_fr_custom(
             self, custom_fr_pcg, module='customer_specific',
+            xmlid_prefix='account_',
             csv_out_file='/tmp/account.account.csv',
             fixed_size_code=True, custom2odoo_code_map=None,
             with_taxes=True):
@@ -155,6 +156,7 @@ class AccountChartTemplate(models.Model):
                     % code)
         company.chart_template_id.generate_custom_chart(
             custom_fr_pcg, module=module, csv_out_file=csv_out_file,
+            xmlid_prefix=xmlid_prefix,
             fixed_size_code=fixed_size_code,
             custom2odoo_code_map=custom2odoo_code_map,
             with_taxes=with_taxes)
