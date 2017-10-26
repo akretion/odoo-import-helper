@@ -35,7 +35,7 @@ DELETE FROM account_account WHERE 1=1;
 
 * In the menu *Accounting > Configuration > Accounting > Fiscal Positions*, on each fiscal position, configure the account mapping.
 
-* In the menu *Accounting > Configuration > Accounting > Journals*, on earch journal, configure the default debit account and the default credit account.
+* In the menu *Accounting > Configuration > Accounting > Journals*, on each journal, configure the default debit account and the default credit account.
 
 * On the page *Accounting > Configuration > Settings*, configure the *Inter-Banks Transfer Account*
 
