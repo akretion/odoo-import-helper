@@ -15,7 +15,7 @@ Account Import Helper
 
 This module provides methods to help on the import of accounting-related data, in particular the chart of accounts.
 
-First, in a standard test Odoo database with the chart of account of the official addons, use this module to generate the file *account.account.csv*.
+First, in a standard test Odoo database with the chart of account of the official addons, use the wizard available via the menu *Configuration > Technical > Chart Generate > Chart Generate* to generate the file *account.account.csv*.
 
 Then, in the future production database, after the installation of the official addons that has the chart of accounts for the country:
 

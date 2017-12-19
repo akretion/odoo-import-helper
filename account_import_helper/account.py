@@ -28,7 +28,6 @@ class AccountChartTemplate(models.Model):
     def generate_custom_chart(
             self, custom_chart, module='custom',
             xmlid_prefix='account_',
-            csv_out_file='/tmp/account.account.csv',
             fixed_size_code=True,
             custom2odoo_code_map=None,
             with_taxes=True):
@@ -111,29 +110,12 @@ class AccountChartTemplate(models.Model):
                 raise UserError(_(
                     "Customer account %s '%s' didn't match any Odoo account")
                     % (custom_code, src_custom_dict.get('name')))
-
-        # generate file
-        f = open(csv_out_file, 'w')  # it will over-write an existing file
-        w = unicodecsv.DictWriter(f, [
-            'id',
-            'code',
-            'name',
-            'user_type_xmlid',
-            'reconcile',
-            'tax_xmlids',
-            'note',
-            ], encoding='utf-8')
-        for account_dict in res:
-            w.writerow(account_dict)
-        f.close()
-        logger.info('File %s successfully generated', csv_out_file)
-        return
+        return res
 
     @api.model
     def generate_l10n_fr_custom(
             self, custom_fr_pcg, module='customer_specific',
             xmlid_prefix='account_',
-            csv_out_file='/tmp/account.account.csv',
             fixed_size_code=True, custom2odoo_code_map=None,
             with_taxes=True):
         # This is a sample method
@@ -154,9 +136,10 @@ class AccountChartTemplate(models.Model):
                 raise UserError(
                     _("Account '%s': the 3 first caracters are not digits")
                     % code)
-        company.chart_template_id.generate_custom_chart(
-            custom_fr_pcg, module=module, csv_out_file=csv_out_file,
+        res = company.chart_template_id.generate_custom_chart(
+            custom_fr_pcg, module=module,
             xmlid_prefix=xmlid_prefix,
             fixed_size_code=fixed_size_code,
             custom2odoo_code_map=custom2odoo_code_map,
             with_taxes=with_taxes)
+        return res

@@ -12,20 +12,27 @@
     <field name="model">account.chart.generate</field>
     <field name="arch" type="xml">
         <form string="Generate chart of account">
-            <div name="help">
+            <div name="help" states="step1">
                 <p>Input CSV file must be in UTF-8 with 3 columns (code, name and description) without header line.</p>
-                <p>The result CSV file is written to /tmp/account.account.csv</p>
             </div>
             <group name="main">
+                <field name="state" invisible="1"/>
+            </group>
+            <group name="step1" states="step1">
                 <field name="module"/>
                 <field name="xmlid_prefix"/>
                 <field name="fixed_size_code"/>
                 <field name="with_taxes"/>
-                <field name="csv_file" string="CSV file"/>
+                <field name="csv_file"/>
+            </group>
+            <group name="step2" states="step2">
+                <field name="out_csv_file" filename="out_csv_filename"/>
+                <field name="out_csv_filename" invisible="1"/>
             </group>
             <footer>
-                <button name="run" type="object" string="Generate" class="btn-primary"/>
-                <button special="cancel" string="Cancel" class="oe_link"/>
+                <button name="run" type="object" string="Generate" class="btn-primary" states="step1"/>
+                <button special="cancel" string="Cancel" class="oe_link" states="step1"/>
+                <button special="cancel" string="Close" class="btn-primary" states="step2"/>
             </footer>
         </form>
     </field>
