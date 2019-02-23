@@ -14,7 +14,7 @@
     <field name="arch" type="xml">
         <form string="Generate chart of account">
             <div name="help" states="step1">
-                <p>Input CSV file must be in UTF-8 with 3 columns (code, name and description) without header line.</p>
+                <p>Input CSV file must be in UTF-8 with 3 columns (code, name and description) without header line and with coma as field separator.</p>
             </div>
             <group name="main">
                 <field name="state" invisible="1"/>
