@@ -1,10 +1,10 @@
-# Copyright 2016-2019 Akretion (http://www.akretion.com)
+# Copyright 2016-2020 Akretion (http://www.akretion.com)
 # @author Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 {
     'name': 'Account Import Helper',
-    'version': '12.0.1.0.0',
+    'version': '13.0.1.0.0',
     'category': 'Partner',
     'license': 'AGPL-3',
     'summary': 'Helper methods to import accounting-related data',
@@ -18,25 +18,27 @@ First, in a standard test Odoo database with the chart of account of the officia
 
 Then, in the future production database, after the installation of the official addons that has the chart of accounts for the country:
 
-* Unconfigure the links to the accounts from taxes and ir.properties:
+* Unconfigure the links to the accounts from several objects and ir.properties:
 
-UPDATE account_tax SET account_id=null, refund_account_id=null;
+UPDATE account_journal set default_credit_account_id=null, default_debit_account_id=null;
+
+DELETE from pos_payment_method;
 
 UPDATE ir_property SET value_reference=null WHERE value_reference like 'account.account,%';
 
 * Delete all accounts:
 
-DELETE FROM account_account WHERE 1=1;
+DELETE FROM account_account;
 
-* Go to the menu *Accounting > Adviser > Chart of accounts* and import the file *account.account.csv* (DEPRECATED: enable the option *Show all fields for computation*, so that the columns *user_type_id/id* and *tax_ids/id* are mapped to the right fields *Type / External ID* and *Default Taxes / External ID*)
+* Go to the menu *Invoicing > Configuration > Accounting > Chart of accounts* and import the file *account.account.csv*
 
-* In the menu *Accounting > Configuration > Accounting > Taxes*, on each tax, configure the *Tax Account* and *Tax Account on Refunds*.
+* In the menu *Accounting > Configuration > Accounting > Taxes* and reconfigure the account on taxes.
 
 * In the menu *Accounting > Configuration > Accounting > Fiscal Positions*, on each fiscal position, configure the account mapping.
 
 * In the menu *Accounting > Configuration > Accounting > Journals*, on each journal, configure the default debit account and the default credit account.
 
-* On the page *Accounting > Configuration > Settings*, configure the *Inter-Banks Transfer Account*
+* On the page *Accounting > Configuration > Settings*, configure the *Inter-Banks Transfer Account* (field added by my module account_usability)
 
 * In the menu *Settings > Technical > Parameters > Company Properties*, edit the 4 properties
 
