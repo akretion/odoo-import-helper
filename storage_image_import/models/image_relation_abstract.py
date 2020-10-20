@@ -55,7 +55,9 @@ class ImageRelationAbstract(models.AbstractModel):
     def create(self, vals_list):
         vals_to_create = []
         for vals in vals_list:
-            record = self._get_existing_relation(vals)
+            record = None
+            if "import_from_url" in vals:
+                record = self._get_existing_relation(vals)
             if record:
                 vals.pop("import_from_url")
                 record.write(vals)
