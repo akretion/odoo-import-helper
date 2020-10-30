@@ -4,7 +4,7 @@
 
 {
     'name': 'Account Import Helper',
-    'version': '13.0.1.0.0',
+    'version': '14.0.1.0.0',
     'category': 'Partner',
     'license': 'AGPL-3',
     'summary': 'Helper methods to import accounting-related data',
@@ -20,7 +20,7 @@ Then, in the future production database, after the installation of the official 
 
 * Unconfigure the links to the accounts from several objects and ir.properties:
 
-UPDATE account_journal set default_credit_account_id=null, default_debit_account_id=null;
+UPDATE account_journal set default_account_id=null, suspense_account_id=null, payment_debit_account_id=null, payment_credit_account_id=null;
 
 DELETE from pos_payment_method;
 
@@ -30,15 +30,15 @@ UPDATE ir_property SET value_reference=null WHERE value_reference like 'account.
 
 DELETE FROM account_account;
 
-* Go to the menu *Invoicing > Configuration > Accounting > Chart of accounts* and import the file *account.account.csv*
+* Go to the menu *Invoicing > Configuration > Accounting > Chart of accounts* and import the file *account.account.csv* with Encoding = UTF-8
 
 * In the menu *Accounting > Configuration > Accounting > Taxes* and reconfigure the account on taxes.
 
 * In the menu *Accounting > Configuration > Accounting > Fiscal Positions*, on each fiscal position, configure the account mapping.
 
-* In the menu *Accounting > Configuration > Accounting > Journals*, on each journal, configure the default debit account and the default credit account.
+* In the menu *Accounting > Configuration > Accounting > Journals*, on each journal, configure all the fields that point to accounts.
 
-* On the page *Accounting > Configuration > Settings*, configure the *Inter-Banks Transfer Account* (field added by my module account_usability)
+* On the page *Accounting > Configuration > Settings*, configure the *Inter-Banks Transfer Account* (field displayed by my module account_usability)
 
 * In the menu *Settings > Technical > Parameters > Company Properties*, edit the 4 properties
 
@@ -54,6 +54,9 @@ This module has been written by Alexis de Lattre <alexis.delattre@akretion.com> 
     'author': 'Akretion',
     'website': 'http://www.akretion.com',
     'depends': ['account'],
-    'data': ['wizard/account_chart_generate_view.xml'],
+    'data': [
+        'security/ir.model.access.csv',
+        'wizard/account_chart_generate_view.xml',
+        ],
     'installable': True,
 }

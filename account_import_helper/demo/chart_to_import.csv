@@ -1,0 +1,10 @@
+401000,Fournisseurs
+411000,Clients
+607000,Marchandises,Produits achetés pour revente
+626000,Telecom
+706100,Vente de Service France
+706200,Vente de Service UE
+706300,Vente de Service Reste du monde
+707100,Vente marchandise France
+707200,Vente marchandise UE
+707300,Vente marchandise Reste du monde

@@ -86,7 +86,7 @@ class AccountChartGenerate(models.TransientModel):
             })
         fout.close()
         logger.info('End of the generation of CSV file')
-        action = self.env['ir.actions.act_window'].for_xml_id(
-            'account_import_helper', 'account_chart_generate_action')
+        action = self.env.ref(
+            'account_import_helper.account_chart_generate_action').read()[0]
         action['res_id'] = self.ids[0]
         return action
