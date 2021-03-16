@@ -5,7 +5,7 @@
 {
     "name": "Storage Image Product Import",
     "summary": "Helper for importing image for csv base on url",
-    "version": "12.0.1.0.0",
+    "version": "14.0.1.0.0",
     "category": "Storage",
     "website": "www.akretion.com",
     "author": " Akretion",

@@ -51,7 +51,6 @@ class ImageRelationAbstract(models.AbstractModel):
             return None
 
     @api.model_create_multi
-    @api.returns('self', lambda value: value.id)
     def create(self, vals_list):
         vals_to_create = []
         for vals in vals_list:
