@@ -3,12 +3,12 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 {
-    'name': 'Account Import Helper',
-    'version': '14.0.1.0.0',
-    'category': 'Partner',
-    'license': 'AGPL-3',
-    'summary': 'Helper methods to import accounting-related data',
-    'description': """
+    "name": "Account Import Helper",
+    "version": "14.0.1.0.0",
+    "category": "Partner",
+    "license": "AGPL-3",
+    "summary": "Helper methods to import accounting-related data",
+    "description": """
 Account Import Helper
 =====================
 
@@ -51,12 +51,12 @@ and set the field *value* with *account.account,67* where 67 is the ID of the ac
 
 This module has been written by Alexis de Lattre <alexis.delattre@akretion.com> from Akretion.
     """,
-    'author': 'Akretion',
-    'website': 'http://www.akretion.com',
-    'depends': ['account'],
-    'data': [
-        'security/ir.model.access.csv',
-        'wizard/account_chart_generate_view.xml',
-        ],
-    'installable': True,
+    "author": "Akretion",
+    "website": "https://github.com/akretion/odoo-import-helper",
+    "depends": ["account"],
+    "data": [
+        "security/ir.model.access.csv",
+        "wizard/account_chart_generate_view.xml",
+    ],
+    "installable": True,
 }

@@ -7,7 +7,7 @@
     "summary": "Helper for importing image for csv base on url",
     "version": "14.0.1.0.0",
     "category": "Storage",
-    "website": "www.akretion.com",
+    "website": "https://github.com/akretion/odoo-import-helper",
     "author": " Akretion",
     "license": "AGPL-3",
     "application": False,
@@ -20,10 +20,7 @@
         "storage_image_import",
         "storage_image_product",
     ],
-    "data": [
-    ],
-    "demo": [
-    ],
-    "qweb": [
-    ]
+    "data": [],
+    "demo": [],
+    "qweb": [],
 }

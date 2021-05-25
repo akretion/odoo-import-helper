@@ -1,10 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <!--
   Copyright 2017-2019 Akretion France
   @author: Alexis de Lattre <alexis.delattre@akretion.com>
   License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 -->
-
 <odoo>
 
 
@@ -14,27 +13,44 @@
     <field name="arch" type="xml">
         <form string="Generate chart of account">
             <div name="help" states="step1">
-                <p>Input CSV file must be in UTF-8 with 3 columns (code, name and description) without header line and with coma as field separator.</p>
+                <p
+                    >Input CSV file must be in UTF-8 with 3 columns (code, name and description) without header line and with coma as field separator.</p>
             </div>
             <group name="main">
-                <field name="state" invisible="1"/>
+                <field name="state" invisible="1" />
             </group>
             <group name="step1" states="step1">
-                <field name="module"/>
-                <field name="xmlid_prefix"/>
-                <field name="fixed_size_code"/>
-                <field name="with_taxes"/>
-                <field name="csv_file" filename="csv_filename"/>
-                <field name="csv_filename" invisible="1"/>
+                <field name="module" />
+                <field name="xmlid_prefix" />
+                <field name="fixed_size_code" />
+                <field name="with_taxes" />
+                <field name="csv_file" filename="csv_filename" />
+                <field name="csv_filename" invisible="1" />
             </group>
             <group name="step2" states="step2">
-                <field name="out_csv_file" filename="out_csv_filename"/>
-                <field name="out_csv_filename" invisible="1"/>
+                <field name="out_csv_file" filename="out_csv_filename" />
+                <field name="out_csv_filename" invisible="1" />
             </group>
             <footer>
-                <button name="run" type="object" string="Generate" class="btn-primary" states="step1"/>
-                <button special="cancel" string="Cancel" class="oe_link" states="step1"/>
-                <button special="cancel" string="Close" class="btn-primary" states="step2"/>
+                <button
+                        name="run"
+                        type="object"
+                        string="Generate"
+                        class="btn-primary"
+                        states="step1"
+                    />
+                <button
+                        special="cancel"
+                        string="Cancel"
+                        class="oe_link"
+                        states="step1"
+                    />
+                <button
+                        special="cancel"
+                        string="Close"
+                        class="btn-primary"
+                        states="step2"
+                    />
             </footer>
         </form>
     </field>
@@ -47,9 +63,17 @@
     <field name="target">new</field>
 </record>
 
-<menuitem id="account_chart_generate_parent_menu" parent="base.menu_custom" name="Chart Generate"/>
+<menuitem
+        id="account_chart_generate_parent_menu"
+        parent="base.menu_custom"
+        name="Chart Generate"
+    />
 
-<menuitem id="account_chart_generate_menu" parent="account_chart_generate_parent_menu" action="account_chart_generate_action" />
+<menuitem
+        id="account_chart_generate_menu"
+        parent="account_chart_generate_parent_menu"
+        action="account_chart_generate_action"
+    />
 
 
 </odoo>

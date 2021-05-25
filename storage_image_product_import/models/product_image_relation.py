@@ -6,10 +6,10 @@ from odoo import models
 
 
 class ProductImageRelation(models.Model):
-    _inherit = 'product.image.relation'
+    _inherit = "product.image.relation"
 
     def _get_domain_for_existing_relation(self, vals):
         return [
             ("product_tmpl_id", "=", vals["product_tmpl_id"]),
-            ("import_from_url", "=", vals["import_from_url"])
-            ]
+            ("import_from_url", "=", vals["import_from_url"]),
+        ]

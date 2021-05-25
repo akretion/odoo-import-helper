@@ -6,6 +6,6 @@ from odoo import fields, models
 
 
 class StorageImage(models.Model):
-    _inherit = 'storage.image'
+    _inherit = "storage.image"
 
     imported_from_url = fields.Char()

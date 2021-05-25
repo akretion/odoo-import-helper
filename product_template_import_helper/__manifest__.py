@@ -7,7 +7,7 @@
     "summary": "Helper for importing product template",
     "version": "14.0.1.0.0",
     "category": "Import",
-    "website": "www.akretion.com",
+    "website": "https://github.com/akretion/odoo-import-helper",
     "author": " Akretion",
     "license": "AGPL-3",
     "application": False,
@@ -20,10 +20,7 @@
         "pattern_import_export",
         "product",
     ],
-    "data": [
-    ],
-    "demo": [
-    ],
-    "qweb": [
-    ]
+    "data": [],
+    "demo": [],
+    "qweb": [],
 }

@@ -7,7 +7,7 @@
     "summary": "Helper for product attribute",
     "version": "14.0.1.0.0",
     "category": "Import",
-    "website": "www.akretion.com",
+    "website": "https://github.com/akretion/odoo-import-helper",
     "author": " Akretion",
     "license": "AGPL-3",
     "application": False,
@@ -19,8 +19,6 @@
     "depends": [
         "product",
     ],
-    "data": [
-    ],
-    "demo": [
-    ],
+    "data": [],
+    "demo": [],
 }
