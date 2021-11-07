@@ -3,8 +3,8 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 {
-    "name": "Product Template Import Helper",
-    "summary": "Helper for importing product template",
+    "name": "Product Pattern Import Helper",
+    "summary": "Helper for importing product using pattern import export",
     "version": "14.0.1.0.0",
     "category": "Import",
     "website": "https://github.com/akretion/odoo-import-helper",
@@ -18,7 +18,7 @@
     },
     "depends": [
         "pattern_import_export",
-        "product",
+        "product_import_helper",
     ],
     "data": [],
     "demo": [],
