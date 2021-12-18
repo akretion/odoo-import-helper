@@ -6,8 +6,7 @@ import base64
 import logging
 from pprint import pprint
 from tempfile import TemporaryFile
-
-import unicodecsv
+import csv
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
@@ -41,30 +40,33 @@ class AccountChartGenerate(models.TransientModel):
         return custom2odoo_code_map
 
     def run(self):
-        fileobj = TemporaryFile("wb+")
+        fileobj = TemporaryFile("w+")
         decoded_csv = base64.b64decode(self.csv_file)
-        fileobj.write(decoded_csv)
+        fileobj.write(decoded_csv.decode('utf-8'))
         fileobj.seek(0)
-        reader = unicodecsv.DictReader(
+        reader = csv.DictReader(
             fileobj,
-            encoding="utf-8",
             delimiter=",",
-            fieldnames=[u"code", u"name", u"note"],
+            fieldnames=["code", "name", "note"],
         )
         custom_chart = []
         for line in reader:
-            if line["code"] and line["name"]:
-                if len(line["code"]) < 3:
+            if (
+                    line["code"]
+                    and line["name"]
+                    and line["code"].strip()
+                    and line["name"].strip()
+            ):
+                code = line["code"].strip()
+                name = line["name"].strip()
+                if len(code) < 3:
                     raise UserError(
-                        _("Account Code '%s' is too small (len < 3)") % line["code"]
-                    )
-                if not line["code"][:3].isdigit():
+                        _("Account Code '%s' is too small (len < 3)") % code)
+                if not code[:3].isdigit():
                     raise UserError(
-                        _("Account '%s': the 3 first caracters are not digits")
-                        % line["code"]
-                    )
+                        _("Account '%s': the 3 first caracters are not digits") % code)
                 custom_chart.append(
-                    (line["code"], {"name": line["name"], "note": line["note"]})
+                    (code, {"name": name, "note": line["note"] and line["note"].strip() or False})
                 )
         pprint(custom_chart)
         logger.info("Starting to generate CSV file")
@@ -76,8 +78,8 @@ class AccountChartGenerate(models.TransientModel):
             custom2odoo_code_map=self._prepare_custom2odoo_code_map(),
             with_taxes=self.with_taxes,
         )
-        fout = TemporaryFile("wb+")
-        w = unicodecsv.DictWriter(
+        fout = TemporaryFile("w+")
+        w = csv.DictWriter(
             fout,
             [
                 "id",
@@ -88,7 +90,6 @@ class AccountChartGenerate(models.TransientModel):
                 "tax_xmlids",
                 "note",
             ],
-            encoding="utf-8",
         )
         for account_dict in res:
             w.writerow(account_dict)
@@ -97,14 +98,13 @@ class AccountChartGenerate(models.TransientModel):
         self.write(
             {
                 "state": "step2",
-                "out_csv_file": base64.b64encode(res_file),
+                "out_csv_file": base64.b64encode(res_file.encode('utf-8')),
                 "out_csv_filename": "account.account-%s.csv" % self.module,
             }
         )
         fout.close()
         logger.info("End of the generation of CSV file")
-        action = self.env.ref(
-            "account_import_helper.account_chart_generate_action"
-        ).read()[0]
+        action = self.env["ir.actions.actions"]._for_xml_id(
+            "account_import_helper.account_chart_generate_action")
         action["res_id"] = self.ids[0]
         return action

@@ -54,7 +54,6 @@ This module has been written by Alexis de Lattre <alexis.delattre@akretion.com> 
     "author": "Akretion",
     "website": "https://github.com/akretion/odoo-import-helper",
     "depends": ["account"],
-    "external_dependencies": {"python": ["unicodecsv"]},
     "data": [
         "security/ir.model.access.csv",
         "wizard/account_chart_generate_view.xml",
