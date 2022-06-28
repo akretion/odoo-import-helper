@@ -2,16 +2,19 @@
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-import base64
-import logging
-from pprint import pprint
-from tempfile import TemporaryFile
-import csv
-
 from odoo import _, fields, models
 from odoo.exceptions import UserError
+import base64
+import logging
+import csv
+from pprint import pprint
+from tempfile import NamedTemporaryFile
 
 logger = logging.getLogger(__name__)
+try:
+    import openpyxl
+except ImportError:
+    logger.debug('Cannot import openpyxl')
 
 
 class AccountChartGenerate(models.TransientModel):
@@ -27,8 +30,9 @@ class AccountChartGenerate(models.TransientModel):
     xmlid_prefix = fields.Char("XMLID prefix", required=True, default="account_")
     fixed_size_code = fields.Boolean(default=True)
     with_taxes = fields.Boolean(default=True)
-    csv_file = fields.Binary(required=True, string="CSV file")
-    csv_filename = fields.Char()
+    input_file = fields.Binary(required=True, string="XLSX file")
+    input_filename = fields.Char()
+    input_has_header_line = fields.Boolean(string="Has a header line", help="Enable this option if the first line of the XLSX file is a header line which must be skipped.")
     out_csv_file = fields.Binary(string="Result CSV file", readonly=True)
     out_csv_filename = fields.Char(readonly=True)
     state = fields.Selection(
@@ -40,25 +44,23 @@ class AccountChartGenerate(models.TransientModel):
         return custom2odoo_code_map
 
     def run(self):
-        fileobj = TemporaryFile("w+")
-        decoded_csv = base64.b64decode(self.csv_file)
-        fileobj.write(decoded_csv.decode('utf-8'))
+        fileobj = NamedTemporaryFile('wb+', prefix='odoo-import_helper-', suffix='.xlsx')
+        file_bytes = base64.b64decode(self.input_file)
+        fileobj.write(file_bytes)
         fileobj.seek(0)
-        reader = csv.DictReader(
-            fileobj,
-            delimiter=",",
-            fieldnames=["code", "name", "note"],
-        )
+        wb = openpyxl.load_workbook(fileobj.name, read_only=True)
+        sh = wb.active
         custom_chart = []
-        for line in reader:
-            if (
-                    line["code"]
-                    and line["name"]
-                    and line["code"].strip()
-                    and line["name"].strip()
-            ):
-                code = line["code"].strip()
-                name = line["name"].strip()
+        i = 0
+        for row in sh.rows:
+            i += 1
+            if i == 1 and self.input_has_header_line:
+                logger.debug('Skipped first line which is header line')
+                continue
+            code = row[0].value and str(row[0].value).strip() or False
+            name = row[1].value and row[1].value.strip() or False
+            note = len(row) > 2 and row[2].value and row[2].value.strip() or False
+            if code and name:
                 if len(code) < 3:
                     raise UserError(
                         _("Account Code '%s' is too small (len < 3)") % code)
@@ -66,8 +68,9 @@ class AccountChartGenerate(models.TransientModel):
                     raise UserError(
                         _("Account '%s': the 3 first caracters are not digits") % code)
                 custom_chart.append(
-                    (code, {"name": name, "note": line["note"] and line["note"].strip() or False})
+                    (code, {"name": name, "note": note})
                 )
+        fileobj.close()
         pprint(custom_chart)
         logger.info("Starting to generate CSV file")
         res = self.env["account.account"].generate_custom_chart(
@@ -78,7 +81,8 @@ class AccountChartGenerate(models.TransientModel):
             custom2odoo_code_map=self._prepare_custom2odoo_code_map(),
             with_taxes=self.with_taxes,
         )
-        fout = TemporaryFile("w+")
+        fout = NamedTemporaryFile(
+            "w+", prefix='odoo-import_helper-out-', suffix='.csv')
         w = csv.DictWriter(
             fout,
             [
