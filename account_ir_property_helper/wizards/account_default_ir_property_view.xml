@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Copyright 2022 Akretion France
+  @author: Alexis de Lattre <alexis.delattre@akretion.com>
+  License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+-->
+<odoo>
+
+
+<record id="account_default_ir_property_form" model="ir.ui.view">
+    <field name="name">account.default.ir.property.form</field>
+    <field name="model">account.default.ir.property</field>
+    <field name="arch" type="xml">
+        <form string="Generate Company Properties">
+            <group name="main">
+                <field name="company_id" />
+                <field name="del_existing_property_res_partner"/>
+                <field name="del_existing_property_product_category"/>
+                <field name="partner_receivable_account_id"/>
+                <field name="partner_receivable_account_property_id" invisible="1"/>
+                <field name="partner_payable_account_id"/>
+                <field name="partner_payable_account_property_id" invisible="1"/>
+                <field name="product_categ_income_account_id"/>
+                <field name="product_categ_income_account_property_id" invisible="1"/>
+                <field name="product_categ_expense_account_id"/>
+                <field name="product_categ_expense_account_property_id" invisible="1"/>
+            </group>
+            <footer>
+                <button name="run" type="object" string="Generate" class="btn-primary" />
+                <button special="cancel" string="Cancel" />
+            </footer>
+        </form>
+    </field>
+</record>
+
+<record id="account_default_ir_property_action" model="ir.actions.act_window">
+    <field name="name">Default Accounting Company Properties</field>
+    <field name="res_model">account.default.ir.property</field>
+    <field name="view_mode">form</field>
+    <field name="target">new</field>
+</record>
+
+<menuitem
+        id="account_default_ir_property_menu"
+        parent="base.menu_ir_property"
+        action="account_default_ir_property_action"
+        sequence="20"
+    />
+
+
+</odoo>
