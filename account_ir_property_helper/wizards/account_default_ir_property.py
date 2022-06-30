@@ -82,13 +82,13 @@ class AccountDefaultIrProperty(models.TransientModel):
                 ('company_id', '=', company_id),
                 ('type', '=', 'many2one'),
                 ('res_id', '=', False),
-                ('value_reference', '=like', 'account.account,%'),
                 ('fields_id', '=', self._get_field_id(field_dict)),
                 ], limit=1)
             if ir_property:
-                account_id = int(ir_property.value_reference.split(',')[1])
-                res[wizard_field] = account_id
                 res[wizard_field.replace('_id', '_property_id')] = ir_property.id
+                if ir_property.value_reference:
+                    account_id = int(ir_property.value_reference.split(',')[1])
+                    res[wizard_field] = account_id
         return res
 
     def run(self):
@@ -113,14 +113,15 @@ class AccountDefaultIrProperty(models.TransientModel):
                 self[prop_field_name].write({'value_reference': value_reference})
                 property_ids.append(self[prop_field_name].id)
             else:
-                new_prop = ipo.create({
+                vals = {
                     'company_id': company_id,
                     'name': field_dict['field'],
                     'fields_id': field_id,
                     'type': 'many2one',
                     'res_id': False,
                     'value_reference': value_reference,
-                    })
+                    }
+                new_prop = ipo.create(vals)
                 property_ids.append(new_prop.id)
         action = self.env["ir.actions.actions"]._for_xml_id("base.ir_property_form")
         action['domain'] = [('id', 'in', property_ids)]
