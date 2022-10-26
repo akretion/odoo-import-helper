@@ -1,4 +1,4 @@
-# Copyright 2016-2020 Akretion France (http://www.akretion.com)
+# Copyright 2016-2022 Akretion France (http://www.akretion.com)
 # @author Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
@@ -45,22 +45,19 @@ class AccountAccount(models.Model):
         # tuple: ('622600', {'name': 'Honoraires comptables'})
         # in the second value of the tuple, we often only put name,
         # but we can put other odoo properties
-        user_type_id2xmlid = self.generate_id2xmlid("account.account.type")
         taxtemplate2xmlid = self.generate_id2xmlid("account.tax.template")
         logger.info("taxtemplate2xmlid = %s", taxtemplate2xmlid)
-        logger.info("user_type_id2xmlid = %s", user_type_id2xmlid)
         company = self.env.user.company_id
         # pre-load odoo's chart of account
         odoo_chart = {}
         accounts = self.search([("company_id", "=", company.id)])
         odoo_code_size = False
         for account in accounts:
-            user_type_xmlid = user_type_id2xmlid[account.user_type_id.id]
             taxes_xmlids = [taxtemplate2xmlid[tax.id] for tax in account.tax_ids]
             odoo_chart[account.code] = {
                 "name": account.name,
                 "reconcile": account.reconcile,
-                "user_type_xmlid": user_type_xmlid,
+                "account_type": account.account_type,
                 "tax_xmlids": ",".join(taxes_xmlids),
             }
             if not odoo_code_size:
@@ -72,7 +69,7 @@ class AccountAccount(models.Model):
                 "id": "id",
                 "code": "code",
                 "name": "name",
-                "user_type_xmlid": "user_type_id/id",
+                "account_type": "account_type",
                 "tax_xmlids": "tax_ids/id",
                 "reconcile": "reconcile",
                 "note": "note",

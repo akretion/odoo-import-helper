@@ -1,10 +1,10 @@
-# Copyright 2016-2020 Akretion (http://www.akretion.com)
+# Copyright 2016-2022 Akretion (http://www.akretion.com)
 # @author Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 {
     "name": "Account Import Helper",
-    "version": "14.0.1.0.0",
+    "version": "16.0.1.0.0",
     "category": "Partner",
     "license": "AGPL-3",
     "summary": "Helper methods to import accounting-related data",
@@ -20,7 +20,7 @@ Then, in the future production database, after the installation of the official 
 
 * Unconfigure the links to the accounts from several objects and ir.properties:
 
-UPDATE account_journal set default_account_id=null, suspense_account_id=null, payment_debit_account_id=null, payment_credit_account_id=null;
+UPDATE account_journal set default_account_id=null, suspense_account_id=null;
 
 DELETE from pos_payment_method;
 

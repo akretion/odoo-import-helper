@@ -31,22 +31,22 @@ class AccountDefaultIrProperty(models.TransientModel):
     partner_receivable_account_id = fields.Many2one(
         'account.account',
         string='Partner Account Receivable', required=True,
-        domain="[('internal_type', '=', 'receivable'), ('deprecated', '=', False), ('company_id', '=', company_id)]")
+        domain="[('account_type', '=', 'asset_receivable'), ('deprecated', '=', False), ('company_id', '=', company_id)]")
     # target field: property_account_receivable_id
     partner_payable_account_id = fields.Many2one(
         'account.account',
         string='Partner Payable Account', required=True,
-        domain="[('internal_type', '=', 'payable'), ('deprecated', '=', False), ('company_id', '=', company_id)]")
+        domain="[('account_type', '=', 'liability_payable'), ('deprecated', '=', False), ('company_id', '=', company_id)]")
     # target field: property_account_payable_id
     product_categ_income_account_id = fields.Many2one(
         'account.account',
         string='Product Category Income Account', required=True,
-        domain="[('deprecated', '=', False), ('internal_type', '=', 'other'), ('company_id', '=', company_id), ('is_off_balance', '=', False)]")
+        domain="[('deprecated', '=', False), ('account_type', '=', 'income'), ('company_id', '=', company_id), ('is_off_balance', '=', False)]")
     # target field: property_account_income_categ_id
     product_categ_expense_account_id = fields.Many2one(
         'account.account',
         string='Product Category Expense Account', required=True,
-        domain="[('deprecated', '=', False), ('internal_type', '=', 'other'), ('company_id', '=', company_id), ('is_off_balance', '=', False)]")
+        domain="[('deprecated', '=', False), ('account_type', '=', 'expense'), ('company_id', '=', company_id), ('is_off_balance', '=', False)]")
     # target field: property_account_expense_categ_id
     partner_receivable_account_property_id = fields.Many2one(
         'ir.property', readonly=True)

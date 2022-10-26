@@ -1,4 +1,4 @@
-# Copyright 2017-2020 Akretion France
+# Copyright 2017-2022 Akretion France
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
@@ -89,7 +89,7 @@ class AccountChartGenerate(models.TransientModel):
                 "id",
                 "code",
                 "name",
-                "user_type_xmlid",
+                "account_type",
                 "reconcile",
                 "tax_xmlids",
                 "note",
