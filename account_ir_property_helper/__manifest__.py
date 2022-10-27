@@ -4,7 +4,7 @@
 
 {
     "name": "Account Ir Property Helper",
-    "version": "14.0.1.0.0",
+    "version": "14.0.1.0.1",
     "category": "Partner",
     "license": "AGPL-3",
     "summary": "Helper methods to create/update default ir.property for accounting",
