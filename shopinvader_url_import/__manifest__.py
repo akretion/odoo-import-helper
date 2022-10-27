@@ -6,7 +6,7 @@
 {
     "name": "Shopinvader URL Import",
     "summary": "Allow to import url in shopinvader",
-    "version": "14.0.1.0.0",
+    "version": "14.0.1.0.1",
     "development_status": "Alpha",
     "category": "Uncategorized",
     "website": "https://github.com/akretion/odoo-import-helper",
