@@ -102,9 +102,8 @@ class AccountBalanceRest(models.TransientModel):
         move._post(soft=False)
         # reconciliation strategy:
         # we decided that we don't want to delete existing reconcilication
-        # accross self.date
-        # so we just reconcile what we can easily reconcile,
-        # and nothing else
+        # across self.date
+        # so we just reconcile what we can easily reconcile, and nothing else
         for line in move.line_ids:
             if not line.account_id.reconcile:
                 continue
