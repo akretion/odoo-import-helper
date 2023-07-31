@@ -121,7 +121,11 @@ class AccountBalanceRest(models.TransientModel):
             balance = rec_rg[0]["balance"]
             if ccur.is_zero(balance):
                 lines = amlo.search(rec_domain)
-                lines.reconcile()
+                try:
+                    with self.env.cr.savepoint():
+                        lines.reconcile()
+                except Exception as e:
+                    logger.error("Fail to reconcile, %s", e)
                 logger.info(
                     "Reconciled %d lines for account %s partner %s",
                     len(lines),
