@@ -199,7 +199,7 @@ class ResPartner(models.Model):
                 try:
                     logger.info('Checking VAT %s on VIES', vat)
                     res = check_vies(vat)
-                    if not res.get('valid'):
+                    if not res.valid:
                         logger.warning('VIES said that VAT %s is not valid', vat)
                         speedy['logs'].append({
                             'msg': 'VIES said that VAT is not valid',
@@ -209,10 +209,10 @@ class ResPartner(models.Model):
                             'reset': True,
                             })
                         vat = False
-                except Exception:
-                    logger.warning('Could not perform VIES validation on VAT %s', vat)
+                except Exception as e:
+                    logger.warning('Could not perform VIES validation on VAT %s: %s', vat, e)
                     speedy['logs'].append({
-                        'msg': 'Could not perform VIES validation',
+                        'msg': 'Could not perform VIES validation: %s' % e,
                         'value': vat,
                         'vals': vals,
                         'field': 'res.partner,vat',
