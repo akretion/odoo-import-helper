@@ -4,6 +4,8 @@
 
 from odoo import api, models, tools, _
 from odoo.exceptions import UserError
+from odoo.addons.phone_validation.tools import phone_validation
+
 import re
 from unidecode import unidecode
 from collections import defaultdict
@@ -152,15 +154,38 @@ class ResPartner(models.Model):
             vals['street'] = vals['street2']
             vals['street2'] = False
         # COUNTRY
-        country_id = False
+        country_id = country_code = False
         if vals.get('country_name') and isinstance(vals['country_name'], str) and not vals.get('country_id'):
             country_id = self._match_country(vals, speedy)
             vals['country_id'] = country_id
+            country_code = speedy['country']['id2code'][country_id]
         # TITLE
         if not vals.get('is_company') and vals.get('title_code') and isinstance(vals['title_code'], str) and not vals.get('title'):
             title_id = self._match_title(vals, speedy)
             vals['title'] = title_id
-        # TODO add support for phone + warn if phone country doesn't match partner country
+        # PHONE/MOBILE
+        for phone_field in self._phone_get_number_fields():
+            if vals.get(phone_field):
+                number = vals[phone_field]
+                try:
+                    clean_number = phone_validation.phone_format(
+                        number,
+                        country_code,
+                        None,
+                        force_format="INTERNATIONAL",
+                        raise_exception=True
+                    )
+                    logger.info(
+                        'Phone number %s country %s reformatted to %s',
+                        number, country_code, clean_number)
+                    vals[phone_field] = clean_number
+                except Exception as e:
+                    speedy['logs'].append({
+                        'msg': "Failed to reformat with country '%s': %s" % (country_code, e),
+                        'value': number,
+                        'vals': vals,
+                        'field': 'res.partner,%s' % phone_field,
+                        })
         # EMAIL
         if vals.get('email'):
             try:

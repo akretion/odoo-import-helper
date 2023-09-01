@@ -10,7 +10,10 @@
     'summary': 'Helper methods to import partners',
     'author': 'Akretion',
     'website': 'https://github.com/akretion/odoo-import-helper',
-    'depends': ['base'],
+    'depends': [
+        'base',
+        'phone_validation',  # would be nice to avoid depending on it
+        ],
     'data': [
         'security/ir.model.access.csv',
         'wizards/import_show_logs_view.xml',
