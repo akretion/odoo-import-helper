@@ -7,7 +7,9 @@ from odoo.exceptions import UserError
 import re
 from unidecode import unidecode
 from collections import defaultdict
+from datetime import datetime
 import openai
+import pycountry
 from stdnum.eu.vat import is_valid as vat_is_valid, check_vies
 from stdnum.iban import is_valid as iban_is_valid
 from stdnum.fr.siret import is_valid as siret_is_valid
@@ -69,10 +71,17 @@ class ResPartner(models.Model):
         # }
         }
         cyd = speedy['country']
+        code2to3 = {}
+        for country in pycountry.countries:
+            code2to3[country.alpha_2] = country.alpha_3
         for country in self.env['res.country'].search_read([], ['code', 'name']):
             cyd['code2id'][country['code']] = country['id']
             cyd['id2code'][country['id']] = country['code']
             cyd['code2name'][country['code']] = country['name']
+            code3 = code2to3.get(country['code'])
+            if code3:
+                cyd['code2id'][code3] = country['id']
+                cyd['code2name'][code3] = country['name']
         for bank in self.env['res.bank'].with_context(active_test=False).search_read([('bic', '!=', False)], ['name', 'bic']):
             bic = bank['bic'].upper()
             speedy['bank']['bic2id'][bic] = bank['id']
@@ -97,9 +106,29 @@ class ResPartner(models.Model):
     def _import_create(self, vals, speedy, email_check_deliverability=True, create_bank=True):
         rvals = self._import_prepare_vals(vals, speedy, email_check_deliverability=email_check_deliverability, create_bank=create_bank)
         partner = self.create(rvals)
+        if vals.get('create_date'):
+            create_date = vals['create_date']
+            create_date_dt = False
+            if isinstance(create_date, str) and len(create_date) == 10:
+                try:
+                    create_date_dt = datetime.strptime(create_date, '%Y-%m-%d')
+                except Exception as e:
+                    speedy['logs'].append({
+                        'msg': 'Failed to convert to datetime: %s' % e,
+                        'value': vals['create_date'],
+                        'vals': vals,
+                        'field': 'res.partner,create_date',
+                        'reset': True,
+                        })
+            elif isinstance(create_date, datetime):
+                create_date_dt = create_date
+            if create_date_dt:
+                self._cr.execute(
+                    "UPDATE res_partner SET create_date=%s WHERE id=%s",
+                    (create_date_dt, partner.id))
         vals['display_name'] = partner.display_name
         vals['id'] = partner.id
-        logger.info('New partner created: %s ID %d', partner.display_name, partner.id)
+        logger.info('New partner created: %s ID %d from line %d', partner.display_name, partner.id, vals['line'])
         return partner
 
     # vals is a dict to create a res.partner
@@ -127,12 +156,10 @@ class ResPartner(models.Model):
         if vals.get('country_name') and isinstance(vals['country_name'], str) and not vals.get('country_id'):
             country_id = self._match_country(vals, speedy)
             vals['country_id'] = country_id
-            vals.pop('country_name')
         # TITLE
         if not vals.get('is_company') and vals.get('title_code') and isinstance(vals['title_code'], str) and not vals.get('title'):
             title_id = self._match_title(vals, speedy)
             vals['title'] = title_id
-            vals.pop('title_code')
         # TODO add support for phone + warn if phone country doesn't match partner country
         # EMAIL
         if vals.get('email'):
@@ -160,7 +187,7 @@ class ResPartner(models.Model):
                     })
             if not zipcode.isdigit():
                 speedy['logs'].append({
-                    'msg': 'In France, ZIP codes only contain digits.' % len(zipcode),
+                    'msg': 'In France, ZIP codes only contain digits.',
                     'value': zipcode,
                     'vals': vals,
                     'field': 'res.partner,zip',
@@ -222,7 +249,6 @@ class ResPartner(models.Model):
         iban = False
         if vals.get('iban'):
             iban = vals['iban'].upper().replace(' ', '')
-            vals.pop('iban')
             bic = False
             if not iban_is_valid(iban):
                 speedy['logs'].append({
@@ -266,10 +292,26 @@ class ResPartner(models.Model):
                             'vals': vals,
                             'field': 'res.bank,bic',
                             })
-                    vals.pop('bic')
                 if vals.get('bank_ids'):
                     raise UserError(_("vals contains both an 'iban' and a 'bank_ids' keys. This should never happen."))
                 vals['bank_ids'] = [(0, 0, {'acc_number': iban, 'bank_id': bank_id})]
+        # SIREN_OR_SIRET
+        if vals.get('siren_or_siret') and hasattr(self, 'siret'):
+            siren_or_siret = vals['siren_or_siret']
+            siren_or_siret = ''.join(re.findall(r'[0-9]+', siren_or_siret))
+            if siren_or_siret:
+                if len(siren_or_siret) == 14:
+                    vals['siret'] = siren_or_siret
+                elif len(siren_or_siret) == 9:
+                    vals['siren'] = siren_or_siret
+                else:
+                    speedy['logs'].append({
+                        'msg': 'SIREN/SIRET has a length of %d instead of 9 or 14' % len(siren_or_siret),
+                        'value': siren_or_siret,
+                        'vals': vals,
+                        'field': 'res.partner,siret',
+                        'reset': True,
+                        })
         # SIREN
         if vals.get('siren') and hasattr(self, 'siren'):
             siren = vals['siren']
@@ -328,7 +370,7 @@ class ResPartner(models.Model):
                     })
                 siret = False
                 vals.pop('siret')
-            if not siret_is_valid(siret):
+            elif not siret_is_valid(siret):
                 speedy['logs'].append({
                     'msg': 'SIRET is not valid (wrong checksum)',
                     'value': siret,
@@ -391,11 +433,17 @@ class ResPartner(models.Model):
                     'field': 'res.partner.bank,acc_number',
                     })
         if hasattr(self, 'property_account_position_id'):
-            print('')
-        # Keep copy of dict + removal of 'line' key at the very end of this method
+            print('')  # TODO
+        # vals will keep the original keys
+        # rvals will be used for create(), so we need to remove all the keys are don't exist on res.partner
         rvals = dict(vals)
-        if rvals.get('line'):
-            rvals.pop('line')
+        for key in ['line', 'create_date', 'iban', 'bic', 'siren_or_siret', 'title_code', 'country_name']:
+            if key in rvals:
+                rvals.pop(key)
+        if not hasattr(self, 'siren') and 'siren' in rvals:
+            rvals.pop('siren')
+        if not hasattr(self, 'siret') and 'siret' in rvals:
+            rvals.pop('siret')
         return rvals
 
     def _prepare_bank(self, vals, speedy):
@@ -430,7 +478,7 @@ class ResPartner(models.Model):
             'field': 'res.partner,country_id',
             }
         cyd = speedy['country']
-        if len(country_name) == 2:
+        if len(country_name) in (2, 3):
             country_code = country_name.upper()
             if country_code in cyd['code2id']:
                 logger.info("Country name '%s' is an ISO country code (%s)", country_name, cyd['code2name'][country_code])
@@ -472,7 +520,7 @@ class ResPartner(models.Model):
                     speedy['logs'].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which didn't match to any country" % country_code), reset=True)
             else:
                 speedy['logs'].append(
-                    dict(log, msg="ChatGPT didn't answer a 2 letter country code but '%s'" % answer), reset=True)
+                    dict(log, msg="ChatGPT didn't answer a 2 letter country code but '%s'" % answer, reset=True))
         else:
             logger.warning('No answer from chatGPT')
             speedy['logs'].append(dict(log, msg='No answer from chatGPT', reset=True))
