@@ -157,8 +157,9 @@ class ResPartner(models.Model):
         country_id = country_code = False
         if vals.get('country_name') and isinstance(vals['country_name'], str) and not vals.get('country_id'):
             country_id = self._match_country(vals, speedy)
+            # Warning: country_id can be False
             vals['country_id'] = country_id
-            country_code = speedy['country']['id2code'][country_id]
+            country_code = speedy['country']['id2code'].get(country_id)
         # TITLE
         if not vals.get('is_company') and vals.get('title_code') and isinstance(vals['title_code'], str) and not vals.get('title'):
             title_id = self._match_title(vals, speedy)
