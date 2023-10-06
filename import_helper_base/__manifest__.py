@@ -3,16 +3,19 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 {
-    'name': 'Partner Import Helper',
+    'name': 'Import Helper Base',
     'version': '16.0.1.0.0',
     'category': 'Extra Tools',
     'license': 'AGPL-3',
-    'summary': 'Helper methods to import partners',
+    'summary': 'Common code for all import helper modules',
     'author': 'Akretion',
     'website': 'https://github.com/akretion/odoo-import-helper',
     'depends': [
-        'import_helper_base',
-        'phone_validation',  # would be nice to avoid depending on it ?
+        'base',
+        ],
+    'data': [
+        'security/ir.model.access.csv',
+        'wizards/import_show_logs_view.xml',
         ],
     'installable': True,
 }

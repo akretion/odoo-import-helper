@@ -28,16 +28,9 @@ class ResPartner(models.Model):
     # TODO add support for states
     @api.model
     def _import_speedy(self):
-        logger.debug('Start to prepare import speedy')
-        openai_api_key = tools.config.get('openai_api_key', False)
-        if not openai_api_key:
-            raise UserError(_(
-                "Missing entry openai_api_key in the Odoo server configuration file."))
-        openai.api_key = openai_api_key
-
-        speedy = {
+        speedy = self.env['import.show.logs']._import_speedy(chatgpt=True)
+        speedy.update({
             "o2m_phone": hasattr(self.env['res.partner'], 'phone_ids'),
-            "openai_tokens": 0,
             "eu_country_ids": self.env.ref('base.europe').country_ids.ids,
             "fr_country_id": self.env.ref('base.fr').id,
             'country': {
@@ -62,17 +55,7 @@ class ResPartner(models.Model):
                     'prof': self.env.ref('base.res_partner_title_prof').id,
                 },
             },
-        'field2label': {},
-        'logs': [],
-        # 'logs' should contain a list of dict :
-        # {'msg': 'Checksum IBAN wrong',
-        #  'value': 'FR9879834739',
-        #  'vals': vals,  # used to get the line
-        #                   (and display_name if partner has been created)
-        #  'field': 'res.partner,email',
-        #  'reset': True,  # True if the data is NOT imported in Odoo
-        # }
-        }
+        })
         cyd = speedy['country']
         code2to3 = {}
         for country in pycountry.countries:
@@ -109,26 +92,11 @@ class ResPartner(models.Model):
     def _import_create(self, vals, speedy, email_check_deliverability=True, create_bank=True):
         rvals = self._import_prepare_vals(vals, speedy, email_check_deliverability=email_check_deliverability, create_bank=create_bank)
         partner = self.create(rvals)
-        if vals.get('create_date'):
-            create_date = vals['create_date']
-            create_date_dt = False
-            if isinstance(create_date, str) and len(create_date) == 10:
-                try:
-                    create_date_dt = datetime.strptime(create_date, '%Y-%m-%d')
-                except Exception as e:
-                    speedy['logs'].append({
-                        'msg': 'Failed to convert to datetime: %s' % e,
-                        'value': vals['create_date'],
-                        'vals': vals,
-                        'field': 'res.partner,create_date',
-                        'reset': True,
-                        })
-            elif isinstance(create_date, datetime):
-                create_date_dt = create_date
-            if create_date_dt:
-                self._cr.execute(
-                    "UPDATE res_partner SET create_date=%s WHERE id=%s",
-                    (create_date_dt, partner.id))
+        create_date_dt = self.env['import.show.logs']._prepare_create_date(vals, speedy)
+        if create_date_dt:
+            self._cr.execute(
+                "UPDATE res_partner SET create_date=%s WHERE id=%s",
+                (create_date_dt, partner.id))
         vals['display_name'] = partner.display_name
         vals['id'] = partner.id
         logger.info('New partner created: %s ID %d from line %d', partner.display_name, partner.id, vals['line'])
@@ -177,7 +145,7 @@ class ResPartner(models.Model):
                     else:
                         ptype = '3_phone_primary'
                     for number in vals[phone_field]:
-                        number = self._phone_number_clean(
+                        number = self._import_phone_number_clean(
                             number, country_code, phone_field, vals, speedy)
                         if number:
                             vals['phone_ids'].append(Command.create({
@@ -190,7 +158,7 @@ class ResPartner(models.Model):
                                 ptype = '4_phone_secondary'
                     vals.pop(phone_field)
                 elif isinstance(vals[phone_field], str):
-                    vals[phone_field] = self._phone_number_clean(
+                    vals[phone_field] = self._import_phone_number_clean(
                         vals[phone_field], country_code, phone_field, vals, speedy)
                 else:
                     speedy['logs'].append({
@@ -209,7 +177,7 @@ class ResPartner(models.Model):
                 ptype = '1_email_primary'
                 for email in vals['email']:
                     if email and isinstance(email, str):
-                        email = self._email_validate(email, email_check_deliverability, vals, speedy)
+                        email = self._import_email_validate(email, email_check_deliverability, vals, speedy)
                         if email:
                             vals['phone_ids'].append(Command.create({
                                 'type': ptype,
@@ -218,7 +186,7 @@ class ResPartner(models.Model):
                             ptype = '2_email_secondary'
                 vals.pop('email')
             elif isinstance(vals['email'], str):
-                vals['email'] = self._email_validate(vals['email'], email_check_deliverability, vals, speedy)
+                vals['email'] = self._import_email_validate(vals['email'], email_check_deliverability, vals, speedy)
             else:
                 speedy['logs'].append({
                     'msg': 'email key should be a string, not %s' % type(vals['email']),
@@ -330,7 +298,7 @@ class ResPartner(models.Model):
                         bank_id = speedy['bank']['bic2id'][bic]
                     elif create_bank:
                         bank = self.env['res.bank'].create(
-                            self._prepare_bank(vals, speedy))
+                            self._import_prepare_bank(vals, speedy))
                         speedy['bank']['bic2id'][bic] = bank.id
                         speedy['bank']['bic2name'][bic] = bank.name
                         speedy['logs'].append({
@@ -500,7 +468,7 @@ class ResPartner(models.Model):
             rvals.pop('siret')
         return rvals
 
-    def _phone_number_clean(self, number, country_code, phone_field, vals, speedy):
+    def _import_phone_number_clean(self, number, country_code, phone_field, vals, speedy):
         try:
             clean_number = phone_validation.phone_format(
                 number,
@@ -522,7 +490,7 @@ class ResPartner(models.Model):
                 })
         return number
 
-    def _email_validate(self, email, email_check_deliverability, vals, speedy):
+    def _import_email_validate(self, email, email_check_deliverability, vals, speedy):
         try:
             validate_email(email, check_deliverability=email_check_deliverability)
         except EmailNotValidError as e:
@@ -536,7 +504,7 @@ class ResPartner(models.Model):
             email = False
         return email
 
-    def _prepare_bank(self, vals, speedy):
+    def _import_prepare_bank(self, vals, speedy):
         assert vals.get('bic')
         bic = vals['bic'].upper()
         vals = {
@@ -616,70 +584,5 @@ class ResPartner(models.Model):
             speedy['logs'].append(dict(log, msg='No answer from chatGPT', reset=True))
         return False
 
-    def _field_label(self, field, speedy):
-        if field not in speedy['field2label']:
-            field_split = field.split(',')
-            ofield = self.env['ir.model.fields'].search([
-                ('model', '=', field_split[0]),
-                ('name', '=', field_split[1]),
-                ], limit=1)
-            if ofield:
-                speedy['field2label'][field] = ofield.field_description
-            else:
-                speedy['field2label'][field] = '%s (%s)' % (
-                    field_split[1], field_split[0])
-        return speedy['field2label'][field]
-
-    def _import_logs2html(self, speedy):
-        line2logs = defaultdict(list)
-        field2logs = defaultdict(list)
-        for log in speedy['logs']:
-            if log['vals'].get('line'):
-                line2logs[log['vals']['line']].append(log)
-            if log.get('field'):
-                field2logs[log['field']].append(log)
-        html = '<p><small>For the logs in <span style="color: red">red</span>, the data was <b>not imported</b> in Odoo</small><br/>'
-        html += '<small><b>%d</b> OpenAI tokens where used</small></p>' % speedy['openai_tokens']
-        html += '<h1>Logs per line</h1>'
-        for line, logs in line2logs.items():
-            log_labels = []
-            for log in logs:
-                log_labels.append(
-                    '<li style="color: %s"><b>%s</b>: <b>%s</b> - %s</li>' % (
-                        log.get('reset') and 'red' or 'black',
-                        self._field_label(log['field'], speedy),
-                        log['value'],
-                        log['msg'],
-                        ))
-            h3 = 'Line %s' % line
-            if log['vals'].get('id'):
-                h3 += ' (%s ID %d)' % (log['vals']['display_name'], log['vals']['id'])
-            html += '<h3>%s</h3>\n<p><ul>%s</ul></p>' % (h3, '\n'.join(log_labels))
-        html += '<h1>Logs per field</h1>'
-        for field, logs in field2logs.items():
-            log_labels = []
-            for log in logs:
-                line_label = 'Line %s' % log['vals'].get('line', 'unknown')
-                if log['vals'].get('id'):
-                    line_label += ' (%s ID %d)' % (log['vals']['display_name'], log['vals']['id'])
-                log_labels.append(
-                    '<li style="color: %s"><b>%s</b>: <b>%s</b> - %s</li>' % (
-                        log.get('reset') and 'red' or 'black',
-                        line_label,
-                        log['value'],
-                        log['msg'],
-                        ))
-            html += '<h3>%s</h3>\n<p><ul>%s</ul></p>' % (
-                self._field_label(field, speedy), '\n'.join(log_labels))
-        return html
-
     def _import_result_action(self, speedy):
-        action = {
-            'name': 'Result',
-            'type': 'ir.actions.act_window',
-            'res_model': 'import.show.logs',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': dict(self._context, default_logs=self._import_logs2html(speedy)),
-            }
-        return action
+        return self.env['import.show.logs']._import_result_action(speedy)
