@@ -2,7 +2,7 @@
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
-from odoo import api, models, tools, _
+from odoo import api, models, tools, Command, _
 from odoo.exceptions import UserError
 from odoo.addons.phone_validation.tools import phone_validation
 
@@ -36,6 +36,7 @@ class ResPartner(models.Model):
         openai.api_key = openai_api_key
 
         speedy = {
+            "o2m_phone": hasattr(self.env['res.partner'], 'phone_ids'),
             "openai_tokens": 0,
             "eu_country_ids": self.env.ref('base.europe').country_ids.ids,
             "fr_country_id": self.env.ref('base.fr').id,
@@ -165,35 +166,62 @@ class ResPartner(models.Model):
             title_id = self._match_title(vals, speedy)
             vals['title'] = title_id
         # PHONE/MOBILE
+        # _phone_get_number_fields() is a method of phone_validation that return ['phone', 'mobile']
         for phone_field in self._phone_get_number_fields():
             if vals.get(phone_field):
-                number = vals[phone_field]
-                try:
-                    clean_number = phone_validation.phone_format(
-                        number,
-                        country_code,
-                        None,
-                        force_format="INTERNATIONAL",
-                        raise_exception=True
-                    )
-                    logger.info(
-                        'Phone number %s country %s reformatted to %s',
-                        number, country_code, clean_number)
-                    vals[phone_field] = clean_number
-                except Exception as e:
+                if speedy['o2m_phone'] and isinstance(vals[phone_field], list):
+                    if 'phone_ids' not in vals:
+                        vals['phone_ids'] = []
+                    if phone_field == 'mobile':
+                        ptype = '5_mobile_primary'
+                    else:
+                        ptype = '3_phone_primary'
+                    for number in vals[phone_field]:
+                        number = self._phone_number_clean(
+                            number, country_code, phone_field, vals, speedy)
+                        if number:
+                            vals['phone_ids'].append(Command.create({
+                                'type': ptype,
+                                'phone': number,
+                                }))
+                            if phone_field == 'mobile':
+                                ptype = '6_mobile_secondary'
+                            else:
+                                ptype = '4_phone_secondary'
+                    vals.pop(phone_field)
+                elif isinstance(vals[phone_field], str):
+                    vals[phone_field] = self._phone_number_clean(
+                        vals[phone_field], country_code, phone_field, vals, speedy)
+                else:
                     speedy['logs'].append({
-                        'msg': "Failed to reformat with country '%s': %s" % (country_code, e),
-                        'value': number,
+                        'msg': '%s key should be a string, not %s' % (phone_field, type(vals['email'])),
+                        'value': vals[phone_field],
                         'vals': vals,
                         'field': 'res.partner,%s' % phone_field,
+                        'reset': True,
                         })
+                    vals[phone_field] = False
         # EMAIL
         if vals.get('email'):
-            try:
-                validate_email(vals['email'], check_deliverability=email_check_deliverability)
-            except EmailNotValidError as e:
+            if speedy['o2m_phone'] and isinstance(vals['email'], list):
+                if 'phone_ids' not in vals:
+                    vals['phone_ids'] = []
+                ptype = '1_email_primary'
+                for email in vals['email']:
+                    if email and isinstance(email, str):
+                        email = self._email_validate(email, email_check_deliverability, vals, speedy)
+                        if email:
+                            vals['phone_ids'].append(Command.create({
+                                'type': ptype,
+                                'email': email,
+                                }))
+                            ptype = '2_email_secondary'
+                vals.pop('email')
+            elif isinstance(vals['email'], str):
+                vals['email'] = self._email_validate(vals['email'], email_check_deliverability, vals, speedy)
+            else:
                 speedy['logs'].append({
-                    'msg': 'Invalid e-mail: %s' % e,
+                    'msg': 'email key should be a string, not %s' % type(vals['email']),
                     'value': vals['email'],
                     'vals': vals,
                     'field': 'res.partner,email',
@@ -471,6 +499,42 @@ class ResPartner(models.Model):
         if not hasattr(self, 'siret') and 'siret' in rvals:
             rvals.pop('siret')
         return rvals
+
+    def _phone_number_clean(self, number, country_code, phone_field, vals, speedy):
+        try:
+            clean_number = phone_validation.phone_format(
+                number,
+                country_code,
+                None,
+                force_format="INTERNATIONAL",
+                raise_exception=True
+            )
+            logger.info(
+                'Phone number %s country %s reformatted to %s',
+                number, country_code, clean_number)
+            number = clean_number
+        except Exception as e:
+            speedy['logs'].append({
+                'msg': "Failed to reformat with country '%s': %s" % (country_code, e),
+                'value': number,
+                'vals': vals,
+                'field': 'res.partner,%s' % phone_field,
+                })
+        return number
+
+    def _email_validate(self, email, email_check_deliverability, vals, speedy):
+        try:
+            validate_email(email, check_deliverability=email_check_deliverability)
+        except EmailNotValidError as e:
+            speedy['logs'].append({
+                'msg': 'Invalid e-mail: %s' % e,
+                'value': email,
+                'vals': vals,
+                'field': 'res.partner,email',
+                'reset': True,
+                })
+            email = False
+        return email
 
     def _prepare_bank(self, vals, speedy):
         assert vals.get('bic')
