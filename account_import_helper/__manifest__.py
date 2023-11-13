@@ -26,6 +26,8 @@ DELETE from pos_payment_method;
 
 UPDATE ir_property SET value_reference=null WHERE value_reference like 'account.account,%';
 
+DELETE from account_fiscal_position_account;
+
 * Delete all accounts:
 
 DELETE FROM account_account;
