@@ -50,7 +50,7 @@ class AccountChartGenerate(models.TransientModel):
         fileobj.seek(0)
         wb = openpyxl.load_workbook(fileobj.name, read_only=True)
         sh = wb.active
-        custom_chart = []
+        custom_chart = {}
         i = 0
         for row in sh.rows:
             i += 1
@@ -67,9 +67,10 @@ class AccountChartGenerate(models.TransientModel):
                 if not code[:3].isdigit():
                     raise UserError(
                         _("Account '%s': the 3 first caracters are not digits") % code)
-                custom_chart.append(
-                    (code, {"name": name, "note": note})
-                )
+                if code in custom_chart:
+                    raise UserError(_(
+                        "Double entry in the chart of account: account '%s'.") % code)
+                custom_chart[code] = {"name": name, "note": note}
         fileobj.close()
         pprint(custom_chart)
         logger.info("Starting to generate CSV file")

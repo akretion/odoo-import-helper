@@ -72,6 +72,7 @@
         id="account_chart_generate_parent_menu"
         parent="base.menu_custom"
         name="Chart Generate"
+        sequence="-1"
     />
 
 <menuitem

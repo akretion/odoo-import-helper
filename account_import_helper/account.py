@@ -76,7 +76,7 @@ class AccountAccount(models.Model):
             }
         )
         custom_code_size = False
-        for (custom_code, src_custom_dict) in custom_chart:
+        for custom_code, src_custom_dict in custom_chart.items():
             if fixed_size_code:
                 if custom_code_size:
                     if len(custom_code) != custom_code_size:
