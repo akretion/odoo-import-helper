@@ -10,7 +10,6 @@ import re
 from unidecode import unidecode
 from collections import defaultdict
 from datetime import datetime
-import openai
 import pycountry
 from stdnum.eu.vat import is_valid as vat_is_valid, check_vies
 from stdnum.iban import is_valid as iban_is_valid
@@ -552,7 +551,7 @@ class ResPartner(models.Model):
         # ask ChatGPT !
         content = """ISO country code of "%s", nothing else""" % country_name
         logger.debug('ChatGPT question: %s', content)
-        chat_completion = openai.ChatCompletion.create(
+        chat_completion = speedy['openai_client'].chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": content}],
             temperature=0,
