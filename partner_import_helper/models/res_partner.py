@@ -36,6 +36,8 @@ class ResPartner(models.Model):
                 'name2code': {
                     "usa": "US",
                     "etatsunis": "US",
+                    "grandebretagne": "GB",
+                    "angleterre": "GB",
                     },
                 'code2id': {},
                 'id2code': {},  # used to check iban and vat number prefixes
