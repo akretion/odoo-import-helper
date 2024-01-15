@@ -15,7 +15,7 @@
         ],
     'data': [
         'security/ir.model.access.csv',
-        'wizards/import_show_logs_view.xml',
+        'wizards/import_helper_view.xml',
         ],
     'installable': True,
 }
