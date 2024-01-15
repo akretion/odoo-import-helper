@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    import openai
+    from openai import OpenAI
 except ImportError:
     logger.debug('Cannot import openai')
 
@@ -42,7 +42,7 @@ class ImportShowLogs(models.TransientModel):
             if not openai_api_key:
                 raise UserError(_(
                     "Missing entry openai_api_key in the Odoo server configuration file."))
-            openai.api_key = openai_api_key
+            speedy['openai_client'] = OpenAI(api_key=openai_api_key)
             speedy['openai_tokens'] = 0
         return speedy
 
