@@ -21,13 +21,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ResPartner(models.Model):
-    _inherit = 'res.partner'
+class ImportHelper(models.TransientModel):
+    _inherit = 'import.helper'
 
     # TODO add support for states
     @api.model
-    def _import_speedy(self):
-        speedy = self.env['import.show.logs']._import_speedy(chatgpt=True)
+    def _prepare_speedy(self, aiengine='chatgpt'):
+        speedy = super()._prepare_speedy(aiengine=aiengine)
+        speedy["logs"]["res.partner"] = []
         speedy.update({
             "o2m_phone": hasattr(self.env['res.partner'], 'phone_ids'),
             "eu_country_ids": self.env.ref('base.europe').country_ids.ids,
@@ -76,24 +77,23 @@ class ResPartner(models.Model):
         for lang in self.env['res.lang'].search([]):
             logger.info('Working on lang %s', lang.code)
             for country in self.env['res.country'].with_context(lang=lang.code).search_read([], ['code', 'name']):
-                country_name_match = self._import_prepare_country_name_match(country['name'])
+                country_name_match = self._prepare_country_name_match(country['name'])
                 cyd['name2code'][country_name_match] = country['code']
 
-        logger.debug('End preparation of import speedy')
         return speedy
 
     @api.model
-    def _import_prepare_country_name_match(self, country_name):
+    def _prepare_country_name_match(self, country_name):
         assert country_name
         country_name_match = unidecode(country_name).lower()
         country_name_match = ''.join(re.findall(r'[a-z]+', country_name_match))
         assert country_name_match
         return country_name_match
 
-    def _import_create(self, vals, speedy, email_check_deliverability=True, create_bank=True):
-        rvals = self._import_prepare_vals(vals, speedy, email_check_deliverability=email_check_deliverability, create_bank=create_bank)
-        partner = self.create(rvals)
-        create_date_dt = self.env['import.show.logs']._prepare_create_date(vals, speedy)
+    def _create_partner(self, vals, speedy, email_check_deliverability=True, create_bank=True):
+        rvals = self._prepare_partner_vals(vals, speedy, email_check_deliverability=email_check_deliverability, create_bank=create_bank)
+        partner = self.env['res.partner'].create(rvals)
+        create_date_dt = self._prepare_create_date(vals, speedy)
         if create_date_dt:
             self._cr.execute(
                 "UPDATE res_partner SET create_date=%s WHERE id=%s",
@@ -112,7 +112,7 @@ class ResPartner(models.Model):
     # 'iban' => 'bank_ids': [(0, 0, {'acc_number': xxx})]
     # 'bic': => 'bank_ids': [(0, 0, {'acc_number': xxxx, 'bank_id': bank_id})]
     @api.model
-    def _import_prepare_vals(self, vals, speedy, email_check_deliverability=True, create_bank=True):
+    def _prepare_partner_vals(self, vals, speedy, email_check_deliverability=True, create_bank=True):
         assert vals
         assert isinstance(vals, dict)
         assert isinstance(speedy, dict)
@@ -132,11 +132,11 @@ class ResPartner(models.Model):
             country_code = speedy['country']['id2code'].get(country_id)
         # TITLE
         if not vals.get('is_company') and vals.get('title_code') and isinstance(vals['title_code'], str) and not vals.get('title'):
-            title_id = self._match_title(vals, speedy)
+            title_id = self._match_partner_title(vals, speedy)
             vals['title'] = title_id
         # PHONE/MOBILE
         # _phone_get_number_fields() is a method of phone_validation that return ['phone', 'mobile']
-        for phone_field in self._phone_get_number_fields():
+        for phone_field in self.env['res.partner']._phone_get_number_fields():
             if vals.get(phone_field):
                 if speedy['o2m_phone'] and isinstance(vals[phone_field], list):
                     if 'phone_ids' not in vals:
@@ -146,7 +146,7 @@ class ResPartner(models.Model):
                     else:
                         ptype = '3_phone_primary'
                     for number in vals[phone_field]:
-                        number = self._import_phone_number_clean(
+                        number = self._phone_number_clean(
                             number, country_code, phone_field, vals, speedy)
                         if number:
                             vals['phone_ids'].append(Command.create({
@@ -159,10 +159,10 @@ class ResPartner(models.Model):
                                 ptype = '4_phone_secondary'
                     vals.pop(phone_field)
                 elif isinstance(vals[phone_field], str):
-                    vals[phone_field] = self._import_phone_number_clean(
+                    vals[phone_field] = self._phone_number_clean(
                         vals[phone_field], country_code, phone_field, vals, speedy)
                 else:
-                    speedy['logs'].append({
+                    speedy['logs']['res.partner'].append({
                         'msg': '%s key should be a string, not %s' % (phone_field, type(vals['email'])),
                         'value': vals[phone_field],
                         'vals': vals,
@@ -178,7 +178,7 @@ class ResPartner(models.Model):
                 ptype = '1_email_primary'
                 for email in vals['email']:
                     if email and isinstance(email, str):
-                        email = self._import_email_validate(email, email_check_deliverability, vals, speedy)
+                        email = self._email_validate(email, email_check_deliverability, vals, speedy)
                         if email:
                             vals['phone_ids'].append(Command.create({
                                 'type': ptype,
@@ -187,9 +187,9 @@ class ResPartner(models.Model):
                             ptype = '2_email_secondary'
                 vals.pop('email')
             elif isinstance(vals['email'], str):
-                vals['email'] = self._import_email_validate(vals['email'], email_check_deliverability, vals, speedy)
+                vals['email'] = self._email_validate(vals['email'], email_check_deliverability, vals, speedy)
             else:
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': 'email key should be a string, not %s' % type(vals['email']),
                     'value': vals['email'],
                     'vals': vals,
@@ -202,14 +202,14 @@ class ResPartner(models.Model):
             zipcode = vals['zip']
             zipcode = vals['zip'].replace(' ', '')
             if len(zipcode) != 5:
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': 'Zip code has %d chars. In France, they have 5 chars.' % len(zipcode),
                     'value': zipcode,
                     'vals': vals,
                     'field': 'res.partner,zip',
                     })
             if not zipcode.isdigit():
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': 'In France, ZIP codes only contain digits.',
                     'value': zipcode,
                     'vals': vals,
@@ -224,7 +224,7 @@ class ResPartner(models.Model):
                 msg = 'Has a SIREN, but is not marked as a company'
             elif vals.get('siret'):
                 msg = 'Has a SIRET, but is not marked as a company'
-            speedy['logs'].append({
+            speedy['logs']['res.partner'].append({
                 'msg': msg,
                 'value': 'Individual',
                 'vals': vals,
@@ -237,7 +237,7 @@ class ResPartner(models.Model):
             # clean VAT
             vat = ''.join(re.findall(r'[A-Z0-9]+', vat))
             if not vat_is_valid(vat):
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': 'VAT is not valid',
                     'value': vat,
                     'vals': vals,
@@ -251,7 +251,7 @@ class ResPartner(models.Model):
                     res = check_vies(vat)
                     if not res.valid:
                         logger.warning('VIES said that VAT %s is not valid', vat)
-                        speedy['logs'].append({
+                        speedy['logs']['res.partner'].append({
                             'msg': 'VIES said that VAT is not valid',
                             'value': vat,
                             'vals': vals,
@@ -261,7 +261,7 @@ class ResPartner(models.Model):
                         vat = False
                 except Exception as e:
                     logger.warning('Could not perform VIES validation on VAT %s: %s', vat, e)
-                    speedy['logs'].append({
+                    speedy['logs']['res.partner'].append({
                         'msg': 'Could not perform VIES validation: %s' % e,
                         'value': vat,
                         'vals': vals,
@@ -274,7 +274,7 @@ class ResPartner(models.Model):
             iban = vals['iban'].upper().replace(' ', '')
             bic = False
             if not iban_is_valid(iban):
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': 'IBAN is not valid',
                     'value': iban,
                     'vals': vals,
@@ -287,7 +287,7 @@ class ResPartner(models.Model):
                 if vals.get('bic'):
                     bic = vals['bic'].upper()
                     if len(bic) not in (8, 11):
-                        speedy['logs'].append({
+                        speedy['logs']['res.partner'].append({
                             'msg': 'Wrong BIC: length is %d, should be 8 or 11' % len(bic),
                             'value': bic,
                             'vals': vals,
@@ -299,17 +299,17 @@ class ResPartner(models.Model):
                         bank_id = speedy['bank']['bic2id'][bic]
                     elif create_bank:
                         bank = self.env['res.bank'].create(
-                            self._import_prepare_bank(vals, speedy))
+                            self._prepare_res_bank(vals, speedy))
                         speedy['bank']['bic2id'][bic] = bank.id
                         speedy['bank']['bic2name'][bic] = bank.name
-                        speedy['logs'].append({
+                        speedy['logs']['res.partner'].append({
                             'msg': "BIC not found in Odoo. New bank named '%s' created (ID %d)" % (bank.name, bank.id),
                             'value': bic,
                             'vals': vals,
                             'field': 'res.bank,bic',
                             })
                     else:
-                        speedy['logs'].append({
+                        speedy['logs']['res.partner'].append({
                             'msg': "BIC not found in Odoo.",
                             'value': bic,
                             'vals': vals,
@@ -328,7 +328,7 @@ class ResPartner(models.Model):
                 elif len(siren_or_siret) == 9:
                     vals['siren'] = siren_or_siret
                 else:
-                    speedy['logs'].append({
+                    speedy['logs']['res.partner'].append({
                         'msg': 'SIREN/SIRET has a length of %d instead of 9 or 14' % len(siren_or_siret),
                         'value': siren_or_siret,
                         'vals': vals,
@@ -342,7 +342,7 @@ class ResPartner(models.Model):
                 siren = str(siren)
             siren = ''.join(re.findall(r'[0-9]+', siren))
             if len(siren) != 9:
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': 'SIREN has a length of %d instead of 9' % len(siren),
                     'value': siren,
                     'vals': vals,
@@ -352,7 +352,7 @@ class ResPartner(models.Model):
                 siren = False
                 vals.pop('siren')
             if not siren_is_valid(siren):
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': 'SIREN is not valid (wrong checksum)',
                     'value': siren,
                     'vals': vals,
@@ -364,14 +364,14 @@ class ResPartner(models.Model):
             vals['siren'] = siren
             if siren and vat:
                 if vat[:2] != 'FR':
-                    speedy['logs'].append({
+                    speedy['logs']['res.partner'].append({
                     'msg': "Partner has SIREN '%s', so it's VAT number should start with FR" % siren,
                     'value': vat,
                     'vals': vals,
                     'field': 'res.partner,vat',
                     })
                 if vat[4:] != siren:
-                    speedy['logs'].append({
+                    speedy['logs']['res.partner'].append({
                     'msg': "Partner has SIREN '%s', so it must compose the 9 last digits of it's VAT number" % siren,
                     'value': vat,
                     'vals': vals,
@@ -384,7 +384,7 @@ class ResPartner(models.Model):
                 siret = str(siret)
             siret = ''.join(re.findall(r'[0-9]+', siret))
             if len(siret) != 14:
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': 'SIRET has a length of %d instead of 14' % len(siret),
                     'value': siret,
                     'vals': vals,
@@ -394,7 +394,7 @@ class ResPartner(models.Model):
                 siret = False
                 vals.pop('siret')
             elif not siret_is_valid(siret):
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': 'SIRET is not valid (wrong checksum)',
                     'value': siret,
                     'vals': vals,
@@ -406,14 +406,14 @@ class ResPartner(models.Model):
             vals['siret'] = siret
             if siret and vat:
                 if vat[:2] != 'FR':
-                    speedy['logs'].append({
+                    speedy['logs']['res.partner'].append({
                     'msg': "Partner has SIRET '%s', so it's VAT number should start with FR" % siret,
                     'value': vat,
                     'vals': vals,
                     'field': 'res.partner,vat',
                     })
                 if vat[4:] != siret[:9]:
-                    speedy['logs'].append({
+                    speedy['logs']['res.partner'].append({
                     'msg': "Partner has SIRET '%s', so the 9 first digits of the SIRET must compose the 9 last digits of it's VAT number" % siret,
                     'value': vat,
                     'vals': vals,
@@ -421,7 +421,7 @@ class ResPartner(models.Model):
                     })
         if vals.get('siren') and vals.get('siret'):
             if not vals['siret'].startswith(vals['siren']):
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': "Partner has both a SIREN and a SIRET, so its SIRET should start with its SIREN (%s)" % vals['siren'],
                     'value': vals['siret'],
                     'vals': vals,
@@ -442,14 +442,14 @@ class ResPartner(models.Model):
                 elif expected_country_code == 'XI':  # Northern Ireland
                     expected_country_code = 'GB'
                 if expected_country_code != country_code:
-                    speedy['logs'].append({
+                    speedy['logs']['res.partner'].append({
                         'msg': "The country prefix of the VAT number doesn't match the country code '%s'" % country_code,
                         'value': vat,
                         'vals': vals,
                         'field': 'res.partner,vat',
                         })
             if iban and not iban.startswith(country_code):
-                speedy['logs'].append({
+                speedy['logs']['res.partner'].append({
                     'msg': "The country prefix of the IBAN doesn't match the country code '%s'" % country_code,
                     'value': iban,
                     'vals': vals,
@@ -469,7 +469,7 @@ class ResPartner(models.Model):
             rvals.pop('siret')
         return rvals
 
-    def _import_phone_number_clean(self, number, country_code, phone_field, vals, speedy):
+    def _phone_number_clean(self, number, country_code, phone_field, vals, speedy):
         try:
             clean_number = phone_validation.phone_format(
                 number,
@@ -483,7 +483,7 @@ class ResPartner(models.Model):
                 number, country_code, clean_number)
             number = clean_number
         except Exception as e:
-            speedy['logs'].append({
+            speedy['logs']['res.partner'].append({
                 'msg': "Failed to reformat with country '%s': %s" % (country_code, e),
                 'value': number,
                 'vals': vals,
@@ -491,11 +491,11 @@ class ResPartner(models.Model):
                 })
         return number
 
-    def _import_email_validate(self, email, email_check_deliverability, vals, speedy):
+    def _email_validate(self, email, email_check_deliverability, vals, speedy):
         try:
             validate_email(email, check_deliverability=email_check_deliverability)
         except EmailNotValidError as e:
-            speedy['logs'].append({
+            speedy['logs']['res.partner'].append({
                 'msg': 'Invalid e-mail: %s' % e,
                 'value': email,
                 'vals': vals,
@@ -505,7 +505,7 @@ class ResPartner(models.Model):
             email = False
         return email
 
-    def _import_prepare_bank(self, vals, speedy):
+    def _prepare_res_bank(self, vals, speedy):
         assert vals.get('bic')
         bic = vals['bic'].upper()
         vals = {
@@ -514,13 +514,13 @@ class ResPartner(models.Model):
             }
         return vals
 
-    def _match_title(self, vals, speedy):
+    def _match_partner_title(self, vals, speedy):
         ttd = speedy['title']
         title_code = vals['title_code']
         if title_code in ttd['code2id']:
             title_id = ttd['code2id'][title_code]
             return title_id
-        speedy['logs'].append({
+        speedy['logs']['res.partner'].append({
             'msg': 'Could not find a title corresponding to code',
             'value': title_code,
             'vals': vals,
@@ -543,7 +543,7 @@ class ResPartner(models.Model):
                 logger.info("Country name '%s' is an ISO country code (%s)", country_name, cyd['code2name'][country_code])
                 country_id = cyd['code2id'][country_code]
                 return country_id
-        country_name_match = self._import_prepare_country_name_match(country_name)
+        country_name_match = self._prepare_country_name_match(country_name)
         if country_name_match in cyd['name2code']:
             country_code = cyd['name2code'][country_name_match]
             logger.info("Country '%s' matched on country %s (%s)", country_name, cyd['code2name'][country_code], country_code)
@@ -571,19 +571,16 @@ class ResPartner(models.Model):
                 country_code = answer.upper()
                 if country_code in cyd['code2id']:
                     logger.info("ChatGPT matched country '%s' to %s (%s)", country_name, cyd['code2name'][country_code], country_code)
-                    speedy['logs'].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which matched to '%s'" % (country_code, cyd['code2name'][country_code])))
+                    speedy['logs']['res.partner'].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which matched to '%s'" % (country_code, cyd['code2name'][country_code])))
                     country_id = cyd['code2id'][country_code]
                     cyd['name2code'][country_name_match] = country_code
                     return country_id
                 else:
-                    speedy['logs'].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which didn't match to any country" % country_code), reset=True)
+                    speedy['logs']['res.partner'].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which didn't match to any country" % country_code), reset=True)
             else:
-                speedy['logs'].append(
+                speedy['logs']['res.partner'].append(
                     dict(log, msg="ChatGPT didn't answer a 2 letter country code but '%s'" % answer, reset=True))
         else:
             logger.warning('No answer from chatGPT')
-            speedy['logs'].append(dict(log, msg='No answer from chatGPT', reset=True))
+            speedy['logs']['res.partner'].append(dict(log, msg='No answer from chatGPT', reset=True))
         return False
-
-    def _import_result_action(self, speedy):
-        return self.env['import.show.logs']._import_result_action(speedy)

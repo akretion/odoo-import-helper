@@ -17,7 +17,8 @@ Here is some sample code:
 .. code::
 
   # parse Excel or CSV that contains the products to import in Odoo
-  speedy = self.env['product.product']._import_speedy()
+  import_obj = self.env['import.helper']
+  speedy = import_obj._prepare_speedy()
   line = 0
   for row in reader:  # loop on lines of the Excel
       line += 1
@@ -32,12 +33,12 @@ Here is some sample code:
           'stock_qty': row[6],
           'create_date': row[10],  # in format %Y-%m-%d
           }
-      self.env['product.product']._import_create(vals, speedy)
-  action = self.env['product.product']._import_result_action(speedy)
+      import_obj._create_product(vals, speedy)
+  action = import_obj._result_action(speedy)
   return action  # show import logs to the user
 
 
-In the sample code above, ``vals`` is the dictionary that will be passed to ``create()``, with few differences:
+In the sample code above, ``vals`` is the dictionary that will be passed to ``create()`` of product.product, with few differences:
 
 - it must contain a **'line'** key to indicate the Excel/CSV import ref in logs, which will be removed before calling ``create()``,
 - it can contain a **'vat_rate'** key with the VAT rate x 10 as integer (20% -> 200, 10% -> 100, 5,5% -> 55, 2,1% -> 21) that will be used to set the fiscal classification,

@@ -27,7 +27,8 @@ Here is some sample code:
 .. code::
 
   # parse Excel or CSV that contains the partners to import in Odoo
-  speedy = self.env['res.partner']._import_speedy()
+  import_obj = self.env['import.helper']
+  speedy = import_obj._prepare_speedy()
   line = 0
   for row in reader:  # loop on lines of the Excel
       line += 1
@@ -46,18 +47,18 @@ Here is some sample code:
           'email': row[9],
           'create_date': row[10],  # in format %Y-%m-%d
           }
-      self.env['res.partner']._import_create(vals, speedy)
-  action = self.env['res.partner']._import_result_action(speedy)
+      import_obj._create_partner(vals, speedy)
+  action = import_obj._result_action(speedy)
   return action  # show import logs to the user
 
 
-In the sample code above, ``vals`` is the dictionary that will be passed to ``create()``, with few differences:
+In the sample code above, ``vals`` is the dictionary that will be passed to ``create()`` of res.partner, with few differences:
 
 - it must contain a **'line'** key to indicate the Excel/CSV import ref in logs, which will be removed before calling ``create()``,
 - it can contain a **'country_name'** key with the name of the country, that will be replaced by the native **'country_id'** key,
 - it can contain a **'title_code'** key  with possible values 'madam', 'miss', 'mister', 'doctor' or 'prof' that will be replaced by the native **'title'** key,
 - it can contain an **'iban'** key, that will be replaced by **'bank_ids': [(0, 0, {'acc_number': xxx})]** if the IBAN is valid,
-- along with the 'iban' key, it can contain a **'bic'** key and a **'bank_name'** key that will be replaced by **'bank_ids': [(0, 0, {'acc_number': xxxx, 'bank_id': bank_id})]**. The bank will be created on the fly if the BIC is not already present in the Odoo database, unless ``create_bank=False`` is passed as argument of the method ``_import_create()``,
+- along with the 'iban' key, it can contain a **'bic'** key and a **'bank_name'** key that will be replaced by **'bank_ids': [(0, 0, {'acc_number': xxxx, 'bank_id': bank_id})]**. The bank will be created on the fly if the BIC is not already present in the Odoo database, unless ``create_bank=False`` is passed as argument of the method ``_create_partner()``,
 - it can contain a **'siren_or_siret'** key, that can contain either a SIREN or a SIRET.
 
 Author

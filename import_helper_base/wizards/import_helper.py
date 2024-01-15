@@ -15,20 +15,22 @@ try:
 except ImportError:
     logger.debug('Cannot import openai')
 
-class ImportShowLogs(models.TransientModel):
-    _name = "import.show.logs"
-    _description = "Pop-up to show warnings after import"
+
+class ImportHelper(models.TransientModel):
+    _name = "import.helper"
+    _description = "Helper to import data in Odoo"
 
     logs = fields.Html(readonly=True)
 
     @api.model
-    def _import_speedy(self, chatgpt=False):
+    def _prepare_speedy(self, aiengine='chatgpt'):
         logger.debug('Start to prepare import speedy')
         speedy = {
-            'chatgpt': chatgpt,
+            'aiengine': aiengine,
             'field2label': {},
-            'logs': [],
-        # 'logs' should contain a list of dict :
+            'logs': {},
+        # 'logs' is a dict {'res.partner': [], 'product.product': []}
+        # where the value is a list of dict :
         # {'msg': 'Checksum IBAN wrong',
         #  'value': 'FR9879834739',
         #  'vals': vals,  # used to get the line
@@ -37,7 +39,7 @@ class ImportShowLogs(models.TransientModel):
         #  'reset': True,  # True if the data is NOT imported in Odoo
         # }
         }
-        if chatgpt:
+        if aiengine == 'chatgpt':
             openai_api_key = tools.config.get('openai_api_key', False)
             if not openai_api_key:
                 raise UserError(_(
@@ -60,58 +62,62 @@ class ImportShowLogs(models.TransientModel):
                     field_split[1], field_split[0])
         return speedy['field2label'][field]
 
-    def _import_logs2html(self, speedy):
-        line2logs = defaultdict(list)
-        field2logs = defaultdict(list)
-        for log in speedy['logs']:
-            if log['vals'].get('line'):
-                line2logs[log['vals']['line']].append(log)
-            if log.get('field'):
-                field2logs[log['field']].append(log)
+    def _convert_logs2html(self, speedy):
         html = '<p><small>For the logs in <span style="color: red">red</span>, the data was <b>not imported</b> in Odoo</small><br/>'
-        if speedy.get('chatgpt'):
+        if speedy.get('aiengine') == 'chatgpt':
             html += '<small><b>%d</b> OpenAI tokens where used</small></p>' % speedy['openai_tokens']
-        html += '<h1>Logs per line</h1>'
-        for line, logs in line2logs.items():
-            log_labels = []
-            for log in logs:
-                log_labels.append(
-                    '<li style="color: %s"><b>%s</b>: <b>%s</b> - %s</li>' % (
-                        log.get('reset') and 'red' or 'black',
-                        self._field_label(log['field'], speedy),
-                        log['value'],
-                        log['msg'],
-                        ))
-            h3 = 'Line %s' % line
-            if log['vals'].get('id'):
-                h3 += ': %s (ID %d)' % (log['vals']['display_name'], log['vals']['id'])
-            html += '<h3>%s</h3>\n<p><ul>%s</ul></p>' % (h3, '\n'.join(log_labels))
-        html += '<h1>Logs per field</h1>'
-        for field, logs in field2logs.items():
-            log_labels = []
-            for log in logs:
-                line_label = 'Line %s' % log['vals'].get('line', 'unknown')
+        for obj_name, log_list in speedy['logs'].items():
+            obj_rec = self.env['ir.model'].search([('model', '=', obj_name)], limit=1)
+            assert obj_rec
+            html += '<h1 style="color:darkblue;">%s</h1>' % obj_rec.name
+            line2logs = defaultdict(list)
+            field2logs = defaultdict(list)
+            for log in log_list:
+                if log['vals'].get('line'):
+                    line2logs[log['vals']['line']].append(log)
+                if log.get('field'):
+                    field2logs[log['field']].append(log)
+            html += '<h2 style="color:darkgreen;">Logs per line</h2>'
+            for line, logs in line2logs.items():
+                log_labels = []
+                for log in logs:
+                    log_labels.append(
+                        '<li style="color: %s"><b>%s</b>: <b>%s</b> - %s</li>' % (
+                            log.get('reset') and 'red' or 'black',
+                            self._field_label(log['field'], speedy),
+                            log['value'],
+                            log['msg'],
+                            ))
+                h3 = 'Line %s' % line
                 if log['vals'].get('id'):
-                    line_label += ' (%s ID %d)' % (log['vals']['display_name'], log['vals']['id'])
-                log_labels.append(
-                    '<li style="color: %s"><b>%s</b>: <b>%s</b> - %s</li>' % (
-                        log.get('reset') and 'red' or 'black',
-                        line_label,
-                        log['value'],
-                        log['msg'],
-                        ))
-            html += '<h3>%s</h3>\n<p><ul>%s</ul></p>' % (
-                self._field_label(field, speedy), '\n'.join(log_labels))
+                    h3 += ': %s (ID %d)' % (log['vals']['display_name'], log['vals']['id'])
+                html += '<h3>%s</h3>\n<p><ul>%s</ul></p>' % (h3, '\n'.join(log_labels))
+            html += '<h2 style="color:darkgreen;">Logs per field</h2>'
+            for field, logs in field2logs.items():
+                log_labels = []
+                for log in logs:
+                    line_label = 'Line %s' % log['vals'].get('line', 'unknown')
+                    if log['vals'].get('id'):
+                        line_label += ' (%s ID %d)' % (log['vals']['display_name'], log['vals']['id'])
+                    log_labels.append(
+                        '<li style="color: %s"><b>%s</b>: <b>%s</b> - %s</li>' % (
+                            log.get('reset') and 'red' or 'black',
+                            line_label,
+                            log['value'],
+                            log['msg'],
+                            ))
+                html += '<h3>%s</h3>\n<p><ul>%s</ul></p>' % (
+                    self._field_label(field, speedy), '\n'.join(log_labels))
         return html
 
-    def _import_result_action(self, speedy):
+    def _result_action(self, speedy):
         action = {
             'name': 'Result',
             'type': 'ir.actions.act_window',
-            'res_model': 'import.show.logs',
+            'res_model': 'import.helper',
             'view_mode': 'form',
             'target': 'new',
-            'context': dict(self._context, default_logs=self._import_logs2html(speedy)),
+            'context': dict(self._context, default_logs=self._convert_logs2html(speedy)),
             }
         return action
 

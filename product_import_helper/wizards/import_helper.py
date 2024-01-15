@@ -12,8 +12,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ProductProduct(models.Model):
-    _inherit = "product.product"
+class ImportHelper(models.TransientModel):
+    _inherit = "import.helper"
 
 #    fullname = fields.Char(compute="_compute_fullname", store=True)
 
@@ -25,14 +25,15 @@ class ProductProduct(models.Model):
 #            record.fullname = record.display_name
 
     @api.model
-    def _import_speedy(self):
-        speedy = self.env['import.show.logs']._import_speedy(chatgpt=True)
+    def _prepare_speedy(self, aiengine='chatgpt'):
+        speedy = super()._prepare_speedy(aiengine=aiengine)
+        speedy["logs"]["product.product"] = []
         speedy.update({
             'vat_rate2fc_id': {},
             'currency2id': {},
-            'categ2id': {},
-            'barcode2name': {},
-            'default_code2name': {},
+            'product_categ2id': {},
+            'product_barcode2name': {},
+            'product_default_code2name': {},
             'pos': hasattr(self, 'pos_categ_id'),
             'pos_categ2id': {},
             })
@@ -51,7 +52,7 @@ class ProductProduct(models.Model):
         for cur in self.env['res.currency'].search_read([], ['name']):
             speedy['currency2id'][cur['name']] = cur['id']
         for categ in self.env['product.category'].search_read([], ['name']):
-            speedy['categ2id'][categ['name']] = categ['id']
+            speedy['product_categ2id'][categ['name']] = categ['id']
         if speedy['pos']:
             for pos_categ in self.env['pos.category'].search_read([], ['name']):
                 speedy['pos_categ2id'][pos_categ['name']] = pos_categ['id']
@@ -61,21 +62,21 @@ class ProductProduct(models.Model):
         products = self.env['product.product'].with_context(active_test=False).search_read([], ['display_name', 'barcode', 'default_code'])
         for product in products:
             if product['barcode']:
-                speedy['barcode2name'][product['barcode']] = '%s (ID %d)' % (product['display_name'], product['id'])
+                speedy['product_barcode2name'][product['barcode']] = '%s (ID %d)' % (product['display_name'], product['id'])
             if product['default_code']:
-                speedy['default_code2name'][product['default_code']] = '%s (ID %d)' % (product['display_name'], product['id'])
+                speedy['product_default_code2name'][product['default_code']] = '%s (ID %d)' % (product['display_name'], product['id'])
 
         return speedy
 
-    def _import_create(self, vals, speedy, inventory=True, location_id=False):
+    def _create_product(self, vals, speedy, inventory=True, location_id=False):
         stock_qty = vals.get('stock_qty', 0)
         location_id = location_id or speedy.get('default_location_id')
-        rvals = self._import_prepare_vals(vals, location_id, speedy)
+        rvals = self._prepare_product_vals(vals, location_id, speedy)
         if not rvals:
             logger.warning('Product on line %s skipped', vals.get('line'))
             return False
-        product = self.create(rvals)
-        create_date_dt = self.env['import.show.logs']._prepare_create_date(vals, speedy)
+        product = self.env['product.product'].create(rvals)
+        create_date_dt = self._prepare_create_date(vals, speedy)
         if create_date_dt:
             self._cr.execute(
                 "UPDATE product_product SET create_date=%s WHERE id=%s",
@@ -86,15 +87,15 @@ class ProductProduct(models.Model):
         vals['display_name'] = product.display_name
         vals['id'] = product.id
         if product.barcode:
-            speedy['barcode2name'][product.barcode] = '%s (ID %d)' % (vals['display_name'], vals['id'])
+            speedy['product_barcode2name'][product.barcode] = '%s (ID %d)' % (vals['display_name'], vals['id'])
         if product.default_code:
-            speedy['default_code2name'][product.default_code] = '%s (ID %d)' % (vals['display_name'], vals['id'])
+            speedy['product_default_code2name'][product.default_code] = '%s (ID %d)' % (vals['display_name'], vals['id'])
         logger.info('New product created: %s ID %d from line %d', product.display_name, product.id, vals['line'])
         if inventory and stock_qty:
             if product.type == 'product':
-                product._set_stock_level(stock_qty, location_id, speedy)
+                self._set_stock_level(product, stock_qty, location_id, speedy)
             else:
-                speedy['logs'].append({
+                speedy['logs']['product.product'].append({
                     'msg': 'Cannot set stock_qty=%s on product with type=%s' (stock_qty, product.type),
                     'value': stock_qty,
                     'vals': vals,
@@ -103,15 +104,15 @@ class ProductProduct(models.Model):
                     })
         return product
 
-    def _set_stock_level(self, stock_qty, location_id, speedy):
+    def _set_stock_level(self, product, stock_qty, location_id, speedy):
         if not location_id:
             raise UserError(_("location_id argument is not set and no warehouse in company '%s'.") % self.env.company.display_name)
         self.env['stock.quant'].with_context(inventory_mode=True).create({
-            'product_id': self.id,
+            'product_id': product.id,
             'location_id': location_id,
             'inventory_quantity': stock_qty,
         })._apply_inventory()
-        logger.info('Stock qty %s set on product %s', stock_qty, self.display_name)
+        logger.info('Stock qty %s set on product %s', stock_qty, product.display_name)
 
     # vals is a dict to create a product.product
     # It must contain a 'line' key, to indicate Excel/CSV import ref in logs
@@ -131,7 +132,7 @@ class ProductProduct(models.Model):
     # - orderpoint_max_qty
     # - orderpoint_trigger
     @api.model
-    def _import_prepare_vals(self, vals, location_id, speedy):
+    def _prepare_product_vals(self, vals, location_id, speedy):
         # TODO add support for pos_product_multi_barcode
         assert vals
         assert isinstance(vals, dict)
@@ -140,9 +141,9 @@ class ProductProduct(models.Model):
             if isinstance(value, str):
                 vals[key] = value.strip() or False
         if vals.get('default_code'):
-            if vals['default_code'] in speedy['default_code2name']:
-                speedy['logs'].append({
-                    'msg': "PRODUCT NOT IMPORTED: internal reference '%s' used on another product '%s'" % (vals['default_code'], speedy['default_code2name'][vals['default_code']]),
+            if vals['default_code'] in speedy['product_default_code2name']:
+                speedy['logs']['product.product'].append({
+                    'msg': "PRODUCT NOT IMPORTED: internal reference '%s' used on another product '%s'" % (vals['default_code'], speedy['product_default_code2name'][vals['default_code']]),
                     'value': vals['default_code'],
                     'vals': vals,
                     'field': 'product.product,default_code',
@@ -151,9 +152,9 @@ class ProductProduct(models.Model):
                 return False
         if vals.get('barcode'):
             barcode = vals['barcode']
-            if barcode in speedy['barcode2name']:
-                speedy['logs'].append({
-                    'msg': "PRODUCT NOT IMPORTED: barcode '%s' used on another product '%s'" % (barcode, speedy['barcode2name'][barcode]),
+            if barcode in speedy['product_barcode2name']:
+                speedy['logs']['product.product'].append({
+                    'msg': "PRODUCT NOT IMPORTED: barcode '%s' used on another product '%s'" % (barcode, speedy['product_barcode2name'][barcode]),
                     'value': barcode,
                     'vals': vals,
                     'field': 'product.product,barcode',
@@ -162,14 +163,14 @@ class ProductProduct(models.Model):
                 return False
             if len(barcode) in (8, 13):
                 if not is_valid(barcode):
-                    speedy['logs'].append({
+                    speedy['logs']['product.product'].append({
                         'msg': 'Barcode %s has an invalid checksum' % barcode,
                         'value': barcode,
                         'vals': vals,
                         'field': 'product.product,barcode',
                         })
             else:
-                speedy['logs'].append({
+                speedy['logs']['product.product'].append({
                     'msg': 'Barcode %s has %d caracters (should be 8 or 13 for an EAN barcode)' % (barcode, len(barcode)),
                     'value': barcode,
                     'vals': vals,
@@ -178,7 +179,7 @@ class ProductProduct(models.Model):
         if 'vat_rate' in vals:
             vat_rate = vals['vat_rate']
             if not isinstance(vat_rate, int):
-                speedy['logs'].append({
+                speedy['logs']['product.product'].append({
                     'msg': 'vat_rate key must be an integer, not %s' % type(vat_rate),
                     'value': vat_rate,
                     'vals': vals,
@@ -189,7 +190,7 @@ class ProductProduct(models.Model):
             if vat_rate in speedy['vat_rate2fc_id']:
                 vals['fiscal_classification_id'] = speedy['vat_rate2fc_id'][vat_rate]
             else:
-                speedy['logs'].append({
+                speedy['logs']['product.product'].append({
                     'msg': '%s is not a know VAT rate (%s)' % (vat_rate, ', '.join([str(x) for x in speedy['vat_rate2fc_id']])),
                     'value': vat_rate,
                     'vals': vals,
@@ -197,13 +198,13 @@ class ProductProduct(models.Model):
                     'reset': True,
                     })
         if vals.get('categ_name'):
-            if vals['categ_name'] not in speedy['categ2id']:
-                categ = self.env['product.category'].create(self._import_prepare_product_category(vals, speedy))
-                speedy['categ2id'][vals['categ_name']] = categ.id
-            vals['categ_id'] = speedy['categ2id'][vals['categ_name']]
+            if vals['categ_name'] not in speedy['product_categ2id']:
+                categ = self.env['product.category'].create(self._prepare_product_category(vals, speedy))
+                speedy['product_categ2id'][vals['categ_name']] = categ.id
+            vals['categ_id'] = speedy['product_categ2id'][vals['categ_name']]
         if speedy['pos'] and vals.get('pos_categ_name'):
             if vals['pos_categ_name'] not in speedy['pos_categ2id']:
-                pos_categ = self.env['pos.category'].create(self._import_prepare_pos_category(vals, speedy))
+                pos_categ = self.env['pos.category'].create(self._prepare_pos_category(vals, speedy))
                 speedy['pos_categ2id'][vals['pos_categ_name']] = pos_categ.id
             vals['pos_categ_id'] = speedy['pos_categ2id'][vals['pos_categ_name']]
 
@@ -226,7 +227,7 @@ class ProductProduct(models.Model):
                     if currency in speedy['currency2id']:
                         supplierinfo_vals['currency_id'] = speedy['currency2id'][currency]
                     else:
-                        speedy['logs'].append({
+                        speedy['logs']['product.product'].append({
                             'msg': '%s is not a known currency ISO code' % currency,
                             'value': currency,
                             'vals': vals,
@@ -261,11 +262,8 @@ class ProductProduct(models.Model):
                 rvals.pop(key)
         return rvals
 
-    def _import_prepare_product_category(self, vals, speedy):
+    def _prepare_product_category(self, vals, speedy):
         return {'name': vals['categ_name']}
 
-    def _import_prepare_pos_category(self, vals, speedy):
+    def _prepare_pos_category(self, vals, speedy):
         return {'name': vals['pos_categ_name']}
-
-    def _import_result_action(self, speedy):
-        return self.env['import.show.logs']._import_result_action(speedy)
