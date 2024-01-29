@@ -4,7 +4,7 @@
 
 {
     'name': 'Partner Import Helper',
-    'version': '16.0.1.0.0',
+    'version': '17.0.1.0.0',
     'category': 'Extra Tools',
     'license': 'AGPL-3',
     'summary': 'Helper methods to import partners',
@@ -14,5 +14,5 @@
         'import_helper_base',
         'phone_validation',  # would be nice to avoid depending on it ?
         ],
-    'installable': True,
+    'installable': False,
 }

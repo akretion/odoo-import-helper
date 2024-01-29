@@ -4,7 +4,7 @@
 
 {
     'name': 'Import Helper Base',
-    'version': '16.0.1.0.0',
+    'version': '17.0.1.0.0',
     'category': 'Extra Tools',
     'license': 'AGPL-3',
     'summary': 'Common code for all import helper modules',
@@ -17,5 +17,5 @@
         'security/ir.model.access.csv',
         'wizards/import_helper_view.xml',
         ],
-    'installable': True,
+    'installable': False,
 }

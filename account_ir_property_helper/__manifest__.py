@@ -4,7 +4,7 @@
 
 {
     "name": "Account Ir Property Helper",
-    "version": "16.0.1.0.0",
+    "version": "17.0.1.0.0",
     "category": "Partner",
     "license": "AGPL-3",
     "summary": "Helper methods to create/update default ir.property for accounting",
@@ -27,5 +27,5 @@ I developped this module for a project with many companies where the accountant 
         "security/ir.model.access.csv",
         "wizards/account_default_ir_property_view.xml",
     ],
-    "installable": True,
+    "installable": False,
 }

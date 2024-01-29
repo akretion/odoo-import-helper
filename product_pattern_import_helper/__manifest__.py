@@ -5,7 +5,7 @@
 {
     "name": "Product Pattern Import Helper",
     "summary": "Helper for importing product using pattern import export",
-    "version": "14.0.1.0.0",
+    "version": "17.0.1.0.0",
     "category": "Import",
     "website": "https://github.com/akretion/odoo-import-helper",
     "author": " Akretion",

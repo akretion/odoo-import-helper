@@ -5,7 +5,7 @@
 {
     "name": "Product Import Helper",
     "summary": "Helper for importing product",
-    "version": "16.0.1.0.0",
+    "version": "17.0.1.0.0",
     "category": "Import",
     "website": "https://github.com/akretion/odoo-import-helper",
     "author": " Akretion",
@@ -15,5 +15,5 @@
         "import_helper_base",
         "account_product_fiscal_classification",
     ],
-    "installable": True,
+    "installable": False,
 }
