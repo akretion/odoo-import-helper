@@ -35,9 +35,9 @@ class AccountChartGenerate(models.TransientModel):
     input_has_header_line = fields.Boolean(string="Has a header line", help="Enable this option if the first line of the XLSX file is a header line which must be skipped.")
     out_csv_file = fields.Binary(string="Result CSV file", readonly=True)
     out_csv_filename = fields.Char(readonly=True)
-    state = fields.Selection(
-        [("step1", "step1"), ("step2", "step2")], default="step1", required=True
-    )
+    company_id = fields.Many2one(
+        'res.company', string="Source Company", required=True, readonly=True,
+        default=lambda self: self.env.company)
 
     def _prepare_custom2odoo_code_map(self):
         custom2odoo_code_map = {}
@@ -74,7 +74,7 @@ class AccountChartGenerate(models.TransientModel):
         fileobj.close()
         pprint(custom_chart)
         logger.info("Starting to generate CSV file")
-        res = self.env["account.account"].generate_custom_chart(
+        res = self.company_id.generate_custom_chart(
             custom_chart,
             module=self.module,
             xmlid_prefix=self.xmlid_prefix,
@@ -102,14 +102,16 @@ class AccountChartGenerate(models.TransientModel):
         res_file = fout.read()
         self.write(
             {
-                "state": "step2",
                 "out_csv_file": base64.b64encode(res_file.encode('utf-8')),
                 "out_csv_filename": "account.account-%s.csv" % self.module,
             }
         )
         fout.close()
         logger.info("End of the generation of CSV file")
-        action = self.env["ir.actions.actions"]._for_xml_id(
-            "account_import_helper.account_chart_generate_action")
-        action["res_id"] = self.ids[0]
+        action = {
+            'name': 'Result',
+            'type': 'ir.actions.act_url',
+            'url': f"web/content/?model=account.chart.generate&id={self.id}&filename_field=out_csv_filename&field=out_csv_file&download=true&filename={self.out_csv_filename}",
+            'target': 'new',
+        }
         return action

@@ -12,7 +12,7 @@
     <field name="model">account.chart.generate</field>
     <field name="arch" type="xml">
         <form string="Generate chart of account">
-            <div name="help" states="step1">
+            <div name="help">
                 <p
                         >Input XLSX file must have 3 columns:</p>
                 <ul><li>A. Account Code (field <em>code</em>, required)</li>
@@ -21,9 +21,7 @@
         </ul>
             </div>
             <group name="main">
-                <field name="state" invisible="1" />
-            </group>
-            <group name="step1" states="step1">
+                <field name="company_id" />
                 <field name="module" />
                 <field name="xmlid_prefix" />
                 <field name="fixed_size_code" />
@@ -31,9 +29,7 @@
                 <field name="input_file" filename="input_filename" />
                 <field name="input_filename" invisible="1" />
                 <field name="input_has_header_line"/>
-            </group>
-            <group name="step2" states="step2">
-                <field name="out_csv_file" filename="out_csv_filename" />
+                <field name="out_csv_file" filename="out_csv_filename" invisible="1"/>
                 <field name="out_csv_filename" invisible="1" />
             </group>
             <footer>
@@ -42,19 +38,10 @@
                         type="object"
                         string="Generate"
                         class="btn-primary"
-                        states="step1"
-                    />
-                <button
-                        special="cancel"
-                        string="Cancel"
-                        class="oe_link"
-                        states="step1"
                     />
                 <button
                         special="cancel"
                         string="Close"
-                        class="btn-primary"
-                        states="step2"
                     />
             </footer>
         </form>

@@ -456,7 +456,7 @@ class ImportHelper(models.TransientModel):
                     'field': 'res.partner.bank,acc_number',
                     })
         if hasattr(self, 'property_account_position_id'):
-            print('')  # TODO
+            print('')  # TODO add support for fiscal position
         # vals will keep the original keys
         # rvals will be used for create(), so we need to remove all the keys are don't exist on res.partner
         rvals = dict(vals)
