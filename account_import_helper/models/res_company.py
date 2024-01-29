@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 # - can use 580001
 
 
-class AccountAccount(models.Model):
-    _inherit = "account.account"
+class ResCompany(models.Model):
+    _inherit = "res.company"
 
     @api.model
     def generate_id2xmlid(self, object_name):
@@ -31,7 +31,6 @@ class AccountAccount(models.Model):
             obj_id2xmlid[entry.res_id] = "{}.{}".format(entry.module, entry.name)
         return obj_id2xmlid
 
-    @api.model
     def generate_custom_chart(
         self,
         custom_chart,
@@ -45,12 +44,12 @@ class AccountAccount(models.Model):
         # tuple: ('622600', {'name': 'Honoraires comptables'})
         # in the second value of the tuple, we often only put name,
         # but we can put other odoo properties
+        self.ensure_one()
         taxtemplate2xmlid = self.generate_id2xmlid("account.tax.template")
         logger.info("taxtemplate2xmlid = %s", taxtemplate2xmlid)
-        company = self.env.user.company_id
         # pre-load odoo's chart of account
         odoo_chart = {}
-        accounts = self.search([("company_id", "=", company.id)])
+        accounts = self.env['account.account'].search([("company_id", "=", self.id)])
         odoo_code_size = False
         for account in accounts:
             taxes_xmlids = [taxtemplate2xmlid[tax.id] for tax in account.tax_ids]
@@ -100,11 +99,11 @@ class AccountAccount(models.Model):
                 size = odoo_code_size
             else:
                 size = len(custom_code)
-            match = False
+            exit_while = False
             matching_code = custom_code
             if custom2odoo_code_map and custom_code in custom2odoo_code_map:
                 matching_code = custom2odoo_code_map[custom_code]
-            while size > 1 and not match:
+            while size > 1 and not exit_while:
                 short_matching_code = matching_code[:size]
                 for odoo_code, odoo_dict in odoo_chart.items():
                     if odoo_code.startswith(short_matching_code):
@@ -119,10 +118,10 @@ class AccountAccount(models.Model):
                         if not with_taxes:
                             custom_dict["tax_xmlids"] = ""
                         res.append(custom_dict)
-                        match = True
+                        exit_while = True
                         break
                 size -= 1
-            if not match:
+            if not exit_while:
                 raise UserError(
                     _("Customer account %s '%s' didn't match any Odoo account")
                     % (custom_code, src_custom_dict.get("name"))
