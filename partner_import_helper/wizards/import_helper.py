@@ -57,6 +57,8 @@ class ImportHelper(models.TransientModel):
                     'prof': self.env.ref('base.res_partner_title_prof').id,
                 },
             },
+            'industry_name2id': {},
+            'fiscal_position': {},
         })
         cyd = speedy['country']
         code2to3 = {}
@@ -79,7 +81,33 @@ class ImportHelper(models.TransientModel):
             for country in self.env['res.country'].with_context(lang=lang.code).search_read([], ['code', 'name']):
                 country_name_match = self._prepare_country_name_match(country['name'])
                 cyd['name2code'][country_name_match] = country['code']
-
+        for indus in self.env['res.partner.industry'].with_context(active_test=False).search_read([('name', '!=', False)], ['name']):
+            speedy['industry_name2id'][indus['name']] = indus['id']
+        if (
+                self.env.company.country_id.code == 'FR' and
+                hasattr(self.env['res.partner'], 'property_account_position_id') and
+                hasattr(self.env['account.fiscal.position'], 'fr_vat_type')):
+            fp_count = self.env['account.fiscal.position'].search_count([('company_id', '=', self.env.company.id)])
+            if fp_count:
+                speedy['fiscal_position']['id2name'] = {}
+                speedy['fiscal_position']['frvattype2id'] = {
+                    'france': False,
+                    'france_vendor_vat_on_payment': False,  # not used for the moment
+                    'intracom_b2b': False,
+                    'intracom_b2c': False,
+                    'extracom': False,
+                    }
+                for fr_vat_type in speedy['fiscal_position']['frvattype2id'].keys():
+                    fps = self.env['account.fiscal.position'].search_read([('company_id', '=', self.env.company.id), ('fr_vat_type', '=', fr_vat_type)], ['name'])
+                    if not fps:
+                        raise UserError(_("There are no fiscal position with fr_vat_type=%(fr_vat_type)s in company '%(company)s'.", fr_vat_type=fr_vat_type, company=self.env.company.display_name))
+                    if len(fps) > 1:
+                        logger.warning(
+                            'There are %d fiscal positions with fr_vat_type=%s: %s',
+                            len(fps), fr_vat_type, ' ,'.join([fp['name'] for fp in fps]))
+                    fp = fps[0]
+                    speedy['fiscal_position']['frvattype2id'][fr_vat_type] = fp['id']
+                    speedy['fiscal_position']['id2name'][fp['id']] = fp['name']
         return speedy
 
     @api.model
@@ -321,6 +349,8 @@ class ImportHelper(models.TransientModel):
         # SIREN_OR_SIRET
         if vals.get('siren_or_siret') and hasattr(self.env['res.partner'], 'siret'):
             siren_or_siret = vals['siren_or_siret']
+            if isinstance(siren_or_siret, int):
+                siren_or_siret = str(siren_or_siret)
             siren_or_siret = ''.join(re.findall(r'[0-9]+', siren_or_siret))
             if siren_or_siret:
                 if len(siren_or_siret) == 14:
@@ -432,6 +462,14 @@ class ImportHelper(models.TransientModel):
                 vals['siret'] = False
             else:
                 vals.pop('siren')
+        # INDUSTRY
+        if vals.get('industry_name'):
+            if vals['industry_name'] not in speedy['industry_name2id']:
+                indus = self.env['res.partner.industry'].create(self._prepare_industry(vals, speedy))
+                speedy['industry_name2id'][vals['industry_name']] = indus.id
+            vals['industry_id'] = speedy['industry_name2id'][vals['industry_name']]
+        if 'industry_name' in vals:
+            vals.pop('industry_name')
         if country_id:
             country_code = speedy['country']['id2code'][country_id]
             # TODO Northern Ireland doesn't pass this check
@@ -455,8 +493,26 @@ class ImportHelper(models.TransientModel):
                     'vals': vals,
                     'field': 'res.partner.bank,acc_number',
                     })
-        if hasattr(self.env['res.partner'], 'property_account_position_id'):
-            print('')  # TODO add support for fiscal position
+        # FISCAL POSITION for France
+        if (
+                hasattr(self.env['res.partner'], 'property_account_position_id') and
+                speedy['fiscal_position'].get('frvattype2id') and country_id):
+            if country_id == speedy['fr_country_id']:
+                vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['france']
+            elif country_id in speedy['eu_country_ids']:
+                if vals.get('is_company'):
+                    vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['intracom_b2b']
+                    if not vals.get('vat'):
+                        speedy['logs']['res.partner'].append({
+                            'msg': "The fiscal position Intra-EU B2B has been set but the partner has no VAT.",
+                            'value': speedy['fiscal_position']['id2name'][vals['property_account_position_id']],
+                            'vals': vals,
+                            'field': 'res.partner,property_account_position_id',
+                            })
+                else:
+                    vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['intracom_b2c']
+            else:
+                vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['extracom']
         # vals will keep the original keys
         # rvals will be used for create(), so we need to remove all the keys are don't exist on res.partner
         rvals = dict(vals)
@@ -468,6 +524,9 @@ class ImportHelper(models.TransientModel):
         if not hasattr(self.env['res.partner'], 'siret') and 'siret' in rvals:
             rvals.pop('siret')
         return rvals
+
+    def _prepare_industry(self, vals, speedy):
+        return {'name': vals['industry_name']}
 
     def _phone_number_clean(self, number, country_code, phone_field, vals, speedy):
         try:

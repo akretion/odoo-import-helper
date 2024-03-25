@@ -40,12 +40,13 @@ Here is some sample code:
           'street2': row[2],
           'zip': row[3],
           'city': row[4],
-          'country_name': row[5],
+          'country_name': row[5],  # name or ISO code
           'vat': row[6],
           'siret': row[7],
           'iban': row[8],
           'email': row[9],
-          'create_date': row[10],  # in format %Y-%m-%d
+          'industry_name': row[10],
+          'create_date': row[11],  # in format %Y-%m-%d
           }
       import_obj._create_partner(vals, speedy)
   action = import_obj._result_action(speedy)
@@ -56,6 +57,7 @@ In the sample code above, ``vals`` is the dictionary that will be passed to ``cr
 
 - it must contain a **'line'** key to indicate the Excel/CSV import ref in logs, which will be removed before calling ``create()``,
 - it can contain a **'country_name'** key with the name of the country, that will be replaced by the native **'country_id'** key,
+- it can contain an **'industry_name'** key that will be used to match an existing industry or create a new one,
 - it can contain a **'title_code'** key  with possible values 'madam', 'miss', 'mister', 'doctor' or 'prof' that will be replaced by the native **'title'** key,
 - it can contain an **'iban'** key, that will be replaced by **'bank_ids': [(0, 0, {'acc_number': xxx})]** if the IBAN is valid,
 - along with the 'iban' key, it can contain a **'bic'** key and a **'bank_name'** key that will be replaced by **'bank_ids': [(0, 0, {'acc_number': xxxx, 'bank_id': bank_id})]**. The bank will be created on the fly if the BIC is not already present in the Odoo database, unless ``create_bank=False`` is passed as argument of the method ``_create_partner()``,

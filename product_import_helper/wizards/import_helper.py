@@ -15,15 +15,6 @@ logger = logging.getLogger(__name__)
 class ImportHelper(models.TransientModel):
     _inherit = "import.helper"
 
-#    fullname = fields.Char(compute="_compute_fullname", store=True)
-
-#    @api.depends(
-#        "product_tmpl_id.name", "default_code", "product_template_attribute_value_ids"
-#    )
-#    def _compute_fullname(self):
-#        for record in self.with_context(display_default_code=True, partner_id=False):
-#            record.fullname = record.display_name
-
     @api.model
     def _prepare_speedy(self, aiengine='chatgpt'):
         speedy = super()._prepare_speedy(aiengine=aiengine)
