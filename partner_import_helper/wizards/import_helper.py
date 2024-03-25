@@ -319,7 +319,7 @@ class ImportHelper(models.TransientModel):
                     raise UserError(_("vals contains both an 'iban' and a 'bank_ids' keys. This should never happen."))
                 vals['bank_ids'] = [(0, 0, {'acc_number': iban, 'bank_id': bank_id})]
         # SIREN_OR_SIRET
-        if vals.get('siren_or_siret') and hasattr(self, 'siret'):
+        if vals.get('siren_or_siret') and hasattr(self.env['res.partner'], 'siret'):
             siren_or_siret = vals['siren_or_siret']
             siren_or_siret = ''.join(re.findall(r'[0-9]+', siren_or_siret))
             if siren_or_siret:
@@ -336,7 +336,7 @@ class ImportHelper(models.TransientModel):
                         'reset': True,
                         })
         # SIREN
-        if vals.get('siren') and hasattr(self, 'siren'):
+        if vals.get('siren') and hasattr(self.env['res.partner'], 'siren'):
             siren = vals['siren']
             if isinstance(siren, int):
                 siren = str(siren)
@@ -378,7 +378,7 @@ class ImportHelper(models.TransientModel):
                     'field': 'res.partner,vat',
                     })
         # SIRET
-        if vals.get('siret') and hasattr(self, 'siret'):
+        if vals.get('siret') and hasattr(self.env['res.partner'], 'siret'):
             siret = vals['siret']
             if isinstance(siret, int):
                 siret = str(siret)
@@ -455,7 +455,7 @@ class ImportHelper(models.TransientModel):
                     'vals': vals,
                     'field': 'res.partner.bank,acc_number',
                     })
-        if hasattr(self, 'property_account_position_id'):
+        if hasattr(self.env['res.partner'], 'property_account_position_id'):
             print('')  # TODO add support for fiscal position
         # vals will keep the original keys
         # rvals will be used for create(), so we need to remove all the keys are don't exist on res.partner
@@ -463,9 +463,9 @@ class ImportHelper(models.TransientModel):
         for key in ['line', 'create_date', 'iban', 'bic', 'siren_or_siret', 'title_code', 'country_name']:
             if key in rvals:
                 rvals.pop(key)
-        if not hasattr(self, 'siren') and 'siren' in rvals:
+        if not hasattr(self.env['res.partner'], 'siren') and 'siren' in rvals:
             rvals.pop('siren')
-        if not hasattr(self, 'siret') and 'siret' in rvals:
+        if not hasattr(self.env['res.partner'], 'siret') and 'siret' in rvals:
             rvals.pop('siret')
         return rvals
 
