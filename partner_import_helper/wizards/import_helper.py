@@ -189,7 +189,7 @@ class ImportHelper(models.TransientModel):
                         vals[phone_field], country_code, phone_field, vals, speedy)
                 else:
                     speedy['logs']['res.partner'].append({
-                        'msg': '%s key should be a string, not %s' % (phone_field, type(vals['email'])),
+                        'msg': '%s key should be a string, not %s' % (phone_field, type(vals[phone_field]).__name__),
                         'value': vals[phone_field],
                         'vals': vals,
                         'field': 'res.partner,%s' % phone_field,
@@ -216,7 +216,7 @@ class ImportHelper(models.TransientModel):
                 vals['email'] = self._email_validate(vals['email'], email_check_deliverability, vals, speedy)
             else:
                 speedy['logs']['res.partner'].append({
-                    'msg': 'email key should be a string, not %s' % type(vals['email']),
+                    'msg': 'email key should be a string, not %s' % type(vals['email']).__name__,
                     'value': vals['email'],
                     'vals': vals,
                     'field': 'res.partner,email',
