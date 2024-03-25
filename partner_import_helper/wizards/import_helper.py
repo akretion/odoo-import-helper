@@ -2,14 +2,12 @@
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
-from odoo import api, models, tools, Command, _
+from odoo import api, models, Command, _
 from odoo.exceptions import UserError
 from odoo.addons.phone_validation.tools import phone_validation
 
 import re
 from unidecode import unidecode
-from collections import defaultdict
-from datetime import datetime
 import pycountry
 from stdnum.eu.vat import is_valid as vat_is_valid, check_vies
 from stdnum.iban import is_valid as iban_is_valid
@@ -551,6 +549,9 @@ class ImportHelper(models.TransientModel):
         return number
 
     def _email_validate(self, email, email_check_deliverability, vals, speedy):
+        email = email.strip()
+        if not email:
+            return False
         try:
             validate_email(email, check_deliverability=email_check_deliverability)
         except EmailNotValidError as e:
