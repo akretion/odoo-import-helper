@@ -6,10 +6,16 @@ from odoo import api, fields, models, tools, _
 from odoo.exceptions import UserError
 from collections import defaultdict
 from datetime import datetime
+from unidecode import unidecode
+import re
 
 import logging
 logger = logging.getLogger(__name__)
 
+try:
+    import pycountry
+except ImportError:
+    logger.debug('Cannot import pycountry')
 try:
     from openai import OpenAI
 except ImportError:
@@ -26,6 +32,18 @@ class ImportHelper(models.TransientModel):
     def _prepare_speedy(self, aiengine='chatgpt'):
         logger.debug('Start to prepare import speedy')
         speedy = {
+            # country is used both for partner and product
+            'country': {
+                'name2code': {
+                    "usa": "US",
+                    "etatsunis": "US",
+                    "grandebretagne": "GB",
+                    "angleterre": "GB",
+                    },
+                'code2id': {},
+                'id2code': {},  # used to check iban and vat number prefixes
+                'code2name': {},  # used in log messages
+                },
             'aiengine': aiengine,
             'field2label': {},
             'logs': {},
@@ -39,6 +57,23 @@ class ImportHelper(models.TransientModel):
         #  'reset': True,  # True if the data is NOT imported in Odoo
         # }
         }
+        cyd = speedy['country']
+        code2to3 = {}
+        for country in pycountry.countries:
+            code2to3[country.alpha_2] = country.alpha_3
+        for country in self.env['res.country'].search_read([], ['code', 'name']):
+            cyd['code2id'][country['code']] = country['id']
+            cyd['id2code'][country['id']] = country['code']
+            cyd['code2name'][country['code']] = country['name']
+            code3 = code2to3.get(country['code'])
+            if code3:
+                cyd['code2id'][code3] = country['id']
+                cyd['code2name'][code3] = country['name']
+        for lang in self.env['res.lang'].search([]):
+            logger.info('Working on lang %s', lang.code)
+            for country in self.env['res.country'].with_context(lang=lang.code).search_read([], ['code', 'name']):
+                country_name_match = self._prepare_country_name_match(country['name'])
+                cyd['name2code'][country_name_match] = country['code']
         if aiengine == 'chatgpt':
             openai_api_key = tools.config.get('openai_api_key', False)
             if not openai_api_key:
@@ -47,6 +82,71 @@ class ImportHelper(models.TransientModel):
             speedy['openai_client'] = OpenAI(api_key=openai_api_key)
             speedy['openai_tokens'] = 0
         return speedy
+
+    @api.model
+    def _prepare_country_name_match(self, country_name):
+        assert country_name
+        country_name_match = unidecode(country_name).lower()
+        country_name_match = ''.join(re.findall(r'[a-z]+', country_name_match))
+        assert country_name_match
+        return country_name_match
+
+    def _match_country(self, vals, country_key, model, country_field_name, speedy):
+        assert isinstance(model, str)
+        country_name = vals[country_key]
+        log = {
+            'value': country_name,
+            'vals': vals,
+            'field': f'{model},{country_field_name}',
+            }
+        cyd = speedy['country']
+        if len(country_name) in (2, 3):
+            country_code = country_name.upper()
+            if country_code in cyd['code2id']:
+                logger.info("Country name '%s' is an ISO country code (%s)", country_name, cyd['code2name'][country_code])
+                country_id = cyd['code2id'][country_code]
+                return country_id
+        country_name_match = self._prepare_country_name_match(country_name)
+        if country_name_match in cyd['name2code']:
+            country_code = cyd['name2code'][country_name_match]
+            logger.info("Country '%s' matched on country %s (%s)", country_name, cyd['code2name'][country_code], country_code)
+            country_id = cyd['code2id'][country_code]
+            return country_id
+        logger.info("No direct match for country '%s': now asking ChatGPT.", country_name)
+        # ask ChatGPT !
+        content = """ISO country code of "%s", nothing else""" % country_name
+        logger.debug('ChatGPT question: %s', content)
+        chat_completion = speedy['openai_client'].chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": content}],
+            temperature=0,
+        )
+
+        # print the chat completion
+        tokens = chat_completion.usage.total_tokens
+        logger.debug("%d tokens have been used", tokens)
+        speedy["openai_tokens"] += tokens
+        answer = chat_completion.choices[0].message.content
+        if answer:
+            answer = answer.strip()
+            logger.info('ChatGPT answer: %s', answer)
+            if len(answer) == 2:
+                country_code = answer.upper()
+                if country_code in cyd['code2id']:
+                    logger.info("ChatGPT matched country '%s' to %s (%s)", country_name, cyd['code2name'][country_code], country_code)
+                    speedy['logs'][model].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which matched to '%s'" % (country_code, cyd['code2name'][country_code])))
+                    country_id = cyd['code2id'][country_code]
+                    cyd['name2code'][country_name_match] = country_code
+                    return country_id
+                else:
+                    speedy['logs'][model].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which didn't match to any country" % country_code), reset=True)
+            else:
+                speedy['logs'][model].append(
+                    dict(log, msg="ChatGPT didn't answer a 2 letter country code but '%s'" % answer, reset=True))
+        else:
+            logger.warning('No answer from chatGPT')
+            speedy['logs'][model].append(dict(log, msg='No answer from chatGPT', reset=True))
+        return False
 
     def _field_label(self, field, speedy):
         if field not in speedy['field2label']:
