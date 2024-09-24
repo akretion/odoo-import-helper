@@ -13,6 +13,7 @@
     'depends': [
         'base',
         ],
+    "external_dependencies": {"python" : ["pycountry", "openai"]},
     'data': [
         'security/ir.model.access.csv',
         'wizards/import_helper_view.xml',

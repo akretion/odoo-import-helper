@@ -6,7 +6,6 @@
 from odoo import api, models, Command, _
 from stdnum.ean import is_valid
 from odoo.exceptions import UserError
-from datetime import datetime
 
 import logging
 logger = logging.getLogger(__name__)
@@ -19,29 +18,34 @@ class ImportHelper(models.TransientModel):
     def _prepare_speedy(self, aiengine='chatgpt'):
         speedy = super()._prepare_speedy(aiengine=aiengine)
         speedy["logs"]["product.product"] = []
+        ppo = self.env['product.product']
         speedy.update({
-            'vat_rate2fc_id': {},
             'currency2id': {},
             'product_categ2id': {},
             'product_barcode2name': {},
             'product_default_code2name': {},
-            'pos': hasattr(self, 'pos_categ_id'),
+            'pos': hasattr(ppo, 'pos_categ_id'),
             'pos_categ2id': {},
             'account_code2id': {},
             'route_code2id': {},
+            'intrastat': hasattr(ppo, 'hs_code_id'),
+            'hs_code2id': {},
             })
-        for fc in self.env['account.product.fiscal.classification'].search([]):
-            if len(fc.purchase_tax_ids) == 1 and len(fc.sale_tax_ids) == 1:
-                purchase_rate = int(round(fc.purchase_tax_ids[0].amount * 10))
-                sale_rate = int(round(fc.sale_tax_ids[0].amount * 10))
-                if sale_rate != purchase_rate:
-                    raise UserError(_("On fiscal classification %s (ID %d), the purchase tax rate (%s) is different from the sale tax rate (%s)") % (fc.display_name, fc.id, purchase_rate, sale_rate))
-                speedy['vat_rate2fc_id'][sale_rate] = fc.id
-            elif not fc.purchase_tax_ids and not fc.sale_tax_ids:
-                speedy['vat_rate2fc_id'][0] = fc.id
-            else:
-                logger.warning('Ignoring fiscal classification %s ID %d', fc.display_name, fc.id)
-        logger.info('Fiscal classification map: %s', speedy['vat_rate2fc_id'])
+        # if account_product_fiscal_classification is installed
+        if self.env.get('account.product.fiscal.classification'):
+            speedy["vat_rate2fc_id"] = {}
+            for fc in self.env['account.product.fiscal.classification'].search([]):
+                if len(fc.purchase_tax_ids) == 1 and len(fc.sale_tax_ids) == 1:
+                    purchase_rate = int(round(fc.purchase_tax_ids[0].amount * 10))
+                    sale_rate = int(round(fc.sale_tax_ids[0].amount * 10))
+                    if sale_rate != purchase_rate:
+                        raise UserError(_("On fiscal classification %s (ID %d), the purchase tax rate (%s) is different from the sale tax rate (%s)") % (fc.display_name, fc.id, purchase_rate, sale_rate))
+                    speedy['vat_rate2fc_id'][sale_rate] = fc.id
+                elif not fc.purchase_tax_ids and not fc.sale_tax_ids:
+                    speedy['vat_rate2fc_id'][0] = fc.id
+                else:
+                    logger.warning('Ignoring fiscal classification %s ID %d', fc.display_name, fc.id)
+            logger.info('Fiscal classification map: %s', speedy['vat_rate2fc_id'])
         for cur in self.env['res.currency'].search_read([], ['name']):
             speedy['currency2id'][cur['name']] = cur['id']
         for categ in self.env['product.category'].search_read([], ['name']):
@@ -72,6 +76,9 @@ class ImportHelper(models.TransientModel):
             route = self.env.ref(xmlid, raise_if_not_found=False)
             if route:
                 speedy["route_code2id"][route_code] = route.id
+        if speedy['intrastat']:
+            for hscode in self.env['hs.code'].search_read([], ['local_code']):
+                speedy['hs_code2id'][hscode['local_code']] = hscode['id']
         return speedy
 
     def _create_product(self, vals, speedy, inventory=True, location_id=False):
@@ -102,7 +109,7 @@ class ImportHelper(models.TransientModel):
                 self._set_stock_level(product, stock_qty, location_id, speedy)
             else:
                 speedy['logs']['product.product'].append({
-                    'msg': 'Cannot set stock_qty=%s on product with type=%s' (stock_qty, product.type),
+                    'msg': f'Cannot set stock_qty={stock_qty} on product with type={product.type}',
                     'value': stock_qty,
                     'vals': vals,
                     'field': 'product.product,qty_available',
@@ -182,7 +189,7 @@ class ImportHelper(models.TransientModel):
                     'vals': vals,
                     'field': 'product.product,barcode',
                     })
-        if 'vat_rate' in vals:
+        if 'vat_rate' in vals and 'vat_rate2fc_id' in speedy:
             vat_rate = vals['vat_rate']
             if not isinstance(vat_rate, int):
                 speedy['logs']['product.product'].append({
@@ -216,7 +223,6 @@ class ImportHelper(models.TransientModel):
 
         supplierinfo_vals = {}
         if vals.get('supplier_id'):
-            partner_id = vals['supplier_id']
             supplierinfo_vals = {
                 'partner_id': vals['supplier_id'],
                 'price': vals.get('supplier_price'),
@@ -266,11 +272,29 @@ class ImportHelper(models.TransientModel):
             # field 'responsible_id' is add by the module 'stock'
             # Avoid to have current user as responsible for all imported products !
             vals['responsible_id'] = False
+        # intrastat
+        if speedy['intrastat']:
+            if vals.get('origin_country_name'):
+                origin_country_id = self._match_country(
+                    vals, "origin_country_name", "product.product", "origin_country_id", speedy)
+                vals['origin_country_id'] = origin_country_id
+            hs_code_code = vals.get('hs_code_code')
+            if hs_code_code:
+                if hs_code_code in speedy['hs_code2id']:
+                    vals['hs_code_id'] = speedy['hs_code2id'][hs_code_code]
+                else:
+                    speedy['logs']['product.product'].append({
+                        'msg': 'HS code is not in Odoo',
+                        'value': hs_code_code,
+                        'vals': vals,
+                        'field': 'product.product,hs_code_id',
+                        'reset': True,
+                        })
         # Remove all keys that start with supplier_
         # vals will keep the original keys
         # rvals will be used for create(), so we need to remove all the keys are don't exist on res.partner
         rvals = dict(vals)
-        for key in ['line', 'create_date', 'vat_rate', 'categ_name', 'pos_categ_name', 'stock_qty', 'route_codes', 'income_account_code', 'expense_account_code']:
+        for key in ['line', 'create_date', 'vat_rate', 'categ_name', 'pos_categ_name', 'stock_qty', 'route_codes', 'income_account_code', 'expense_account_code', 'origin_country_name', 'hs_code_code']:
             if key in rvals:
                 rvals.pop(key)
         for key in vals.keys():

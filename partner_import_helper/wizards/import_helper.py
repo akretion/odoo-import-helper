@@ -7,8 +7,6 @@ from odoo.exceptions import UserError
 from odoo.addons.phone_validation.tools import phone_validation
 
 import re
-from unidecode import unidecode
-import pycountry
 from stdnum.eu.vat import is_valid as vat_is_valid, check_vies
 from stdnum.iban import is_valid as iban_is_valid
 from stdnum.fr.siret import is_valid as siret_is_valid
@@ -31,17 +29,6 @@ class ImportHelper(models.TransientModel):
             "o2m_phone": hasattr(self.env['res.partner'], 'phone_ids'),
             "eu_country_ids": self.env.ref('base.europe').country_ids.ids,
             "fr_country_id": self.env.ref('base.fr').id,
-            'country': {
-                'name2code': {
-                    "usa": "US",
-                    "etatsunis": "US",
-                    "grandebretagne": "GB",
-                    "angleterre": "GB",
-                    },
-                'code2id': {},
-                'id2code': {},  # used to check iban and vat number prefixes
-                'code2name': {},  # used in log messages
-                },
             "bank": {
                 'bic2id': {},
                 'bic2name': {},
@@ -60,27 +47,10 @@ class ImportHelper(models.TransientModel):
             # _phone_get_number_fields() is a method of phone_validation that return ['phone', 'mobile']
             'phone_fields': self.env['res.partner']._phone_get_number_fields(),
         })
-        cyd = speedy['country']
-        code2to3 = {}
-        for country in pycountry.countries:
-            code2to3[country.alpha_2] = country.alpha_3
-        for country in self.env['res.country'].search_read([], ['code', 'name']):
-            cyd['code2id'][country['code']] = country['id']
-            cyd['id2code'][country['id']] = country['code']
-            cyd['code2name'][country['code']] = country['name']
-            code3 = code2to3.get(country['code'])
-            if code3:
-                cyd['code2id'][code3] = country['id']
-                cyd['code2name'][code3] = country['name']
         for bank in self.env['res.bank'].with_context(active_test=False).search_read([('bic', '!=', False)], ['name', 'bic']):
             bic = bank['bic'].upper()
             speedy['bank']['bic2id'][bic] = bank['id']
             speedy['bank']['bic2name'][bic] = bank['name']
-        for lang in self.env['res.lang'].search([]):
-            logger.info('Working on lang %s', lang.code)
-            for country in self.env['res.country'].with_context(lang=lang.code).search_read([], ['code', 'name']):
-                country_name_match = self._prepare_country_name_match(country['name'])
-                cyd['name2code'][country_name_match] = country['code']
         for indus in self.env['res.partner.industry'].with_context(active_test=False).search_read([('name', '!=', False)], ['name']):
             speedy['industry_name2id'][indus['name']] = indus['id']
         if (
@@ -109,14 +79,6 @@ class ImportHelper(models.TransientModel):
                     speedy['fiscal_position']['frvattype2id'][fr_vat_type] = fp['id']
                     speedy['fiscal_position']['id2name'][fp['id']] = fp['name']
         return speedy
-
-    @api.model
-    def _prepare_country_name_match(self, country_name):
-        assert country_name
-        country_name_match = unidecode(country_name).lower()
-        country_name_match = ''.join(re.findall(r'[a-z]+', country_name_match))
-        assert country_name_match
-        return country_name_match
 
     def _create_partner(self, vals, speedy, email_check_deliverability=True, create_bank=True):
         rvals = self._prepare_partner_vals(
@@ -149,7 +111,8 @@ class ImportHelper(models.TransientModel):
         # COUNTRY
         country_id = country_code = False
         if vals.get('country_name') and isinstance(vals['country_name'], str) and not vals.get('country_id'):
-            country_id = self._match_country(vals, speedy)
+            country_id = self._match_country(
+                vals, "country_name", "res.partner", "country_id", speedy)
             # Warning: country_id can be False
             vals['country_id'] = country_id
         if parent_or_child == 'child' and not country_id and parent_country_id:
@@ -606,60 +569,4 @@ class ImportHelper(models.TransientModel):
             'field': 'res.partner,title',
             'reset': True,
             })
-        return False
-
-    def _match_country(self, vals, speedy):
-        country_name = vals['country_name']
-        log = {
-            'value': country_name,
-            'vals': vals,
-            'field': 'res.partner,country_id',
-            }
-        cyd = speedy['country']
-        if len(country_name) in (2, 3):
-            country_code = country_name.upper()
-            if country_code in cyd['code2id']:
-                logger.info("Country name '%s' is an ISO country code (%s)", country_name, cyd['code2name'][country_code])
-                country_id = cyd['code2id'][country_code]
-                return country_id
-        country_name_match = self._prepare_country_name_match(country_name)
-        if country_name_match in cyd['name2code']:
-            country_code = cyd['name2code'][country_name_match]
-            logger.info("Country '%s' matched on country %s (%s)", country_name, cyd['code2name'][country_code], country_code)
-            country_id = cyd['code2id'][country_code]
-            return country_id
-        logger.info("No direct match for country '%s': now asking ChatGPT.", country_name)
-        # ask ChatGPT !
-        content = """ISO country code of "%s", nothing else""" % country_name
-        logger.debug('ChatGPT question: %s', content)
-        chat_completion = speedy['openai_client'].chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": content}],
-            temperature=0,
-        )
-
-        # print the chat completion
-        tokens = chat_completion.usage.total_tokens
-        logger.debug("%d tokens have been used", tokens)
-        speedy["openai_tokens"] += tokens
-        answer = chat_completion.choices[0].message.content
-        if answer:
-            answer = answer.strip()
-            logger.info('ChatGPT answer: %s', answer)
-            if len(answer) == 2:
-                country_code = answer.upper()
-                if country_code in cyd['code2id']:
-                    logger.info("ChatGPT matched country '%s' to %s (%s)", country_name, cyd['code2name'][country_code], country_code)
-                    speedy['logs']['res.partner'].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which matched to '%s'" % (country_code, cyd['code2name'][country_code])))
-                    country_id = cyd['code2id'][country_code]
-                    cyd['name2code'][country_name_match] = country_code
-                    return country_id
-                else:
-                    speedy['logs']['res.partner'].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which didn't match to any country" % country_code), reset=True)
-            else:
-                speedy['logs']['res.partner'].append(
-                    dict(log, msg="ChatGPT didn't answer a 2 letter country code but '%s'" % answer, reset=True))
-        else:
-            logger.warning('No answer from chatGPT')
-            speedy['logs']['res.partner'].append(dict(log, msg='No answer from chatGPT', reset=True))
         return False

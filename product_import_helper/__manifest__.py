@@ -13,7 +13,7 @@
     "depends": [
         "stock",  # for stock levels...
         "import_helper_base",
-        "account_product_fiscal_classification",
+        # account_product_fiscal_classification is now optional
     ],
     "installable": True,
 }
