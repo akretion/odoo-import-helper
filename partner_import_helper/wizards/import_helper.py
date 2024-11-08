@@ -7,6 +7,7 @@ from odoo.exceptions import UserError
 from odoo.addons.phone_validation.tools import phone_validation
 
 import re
+import copy
 from stdnum.eu.vat import is_valid as vat_is_valid, check_vies
 from stdnum.iban import is_valid as iban_is_valid
 from stdnum.fr.siret import is_valid as siret_is_valid
@@ -219,6 +220,8 @@ class ImportHelper(models.TransientModel):
             vals, 'parent', speedy, email_check_deliverability=email_check_deliverability)
         if vals.get('child_ids'):
             for child in vals['child_ids']:
+                if 'line' not in child[2]:
+                    child[2]['line'] = vals['line']
                 self._prepare_parent_child_partner_vals(
                     child[2], 'child', speedy,
                     email_check_deliverability=email_check_deliverability,
@@ -495,7 +498,14 @@ class ImportHelper(models.TransientModel):
                 vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['extracom']
         # vals will keep the original keys
         # rvals will be used for create(), so we need to remove all the keys are don't exist on res.partner
-        rvals = dict(vals)
+        rvals = copy.deepcopy(vals)
+        self._remove_technical_keys(rvals)
+        if 'child_ids' in rvals:
+            for child in rvals['child_ids']:
+                self._remove_technical_keys(child[2])
+        return rvals
+
+    def _remove_technical_keys(self, rvals):
         for key in ['line', 'create_date', 'iban', 'bic', 'siren_or_siret', 'title_code', 'country_name']:
             if key in rvals:
                 rvals.pop(key)
@@ -503,7 +513,6 @@ class ImportHelper(models.TransientModel):
             rvals.pop('siren')
         if not hasattr(self.env['res.partner'], 'siret') and 'siret' in rvals:
             rvals.pop('siret')
-        return rvals
 
     def _prepare_industry(self, vals, speedy):
         return {'name': vals['industry_name']}

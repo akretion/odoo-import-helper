@@ -47,6 +47,12 @@ Here is some sample code:
           'email': row[9],
           'industry_name': row[10],
           'create_date': row[11],  # in format %Y-%m-%d
+          'child_ids': [(0, 0, {
+              'type': 'contact',
+              'name': row[12],
+              'phone': row[13],
+              'moile': row[14],
+              })]
           }
       import_obj._create_partner(vals, speedy)
   action = import_obj._result_action(speedy)
@@ -62,6 +68,8 @@ In the sample code above, ``vals`` is the dictionary that will be passed to ``cr
 - it can contain an **'iban'** key, that will be replaced by **'bank_ids': [(0, 0, {'acc_number': xxx})]** if the IBAN is valid,
 - along with the 'iban' key, it can contain a **'bic'** key and a **'bank_name'** key that will be replaced by **'bank_ids': [(0, 0, {'acc_number': xxxx, 'bank_id': bank_id})]**. The bank will be created on the fly if the BIC is not already present in the Odoo database, unless ``create_bank=False`` is passed as argument of the method ``_create_partner()``,
 - it can contain a **'siren_or_siret'** key, that can contain either a SIREN or a SIRET.
+
+For **child_ids**, use the old syntax *[(0, 0, child_vals)]* and not the new syntax *[Command.create(child_vals)]*.
 
 Author
 ======
