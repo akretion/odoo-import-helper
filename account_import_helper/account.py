@@ -49,7 +49,7 @@ class AccountAccount(models.Model):
         taxtemplate2xmlid = self.generate_id2xmlid("account.tax.template")
         logger.info("taxtemplate2xmlid = %s", taxtemplate2xmlid)
         logger.info("user_type_id2xmlid = %s", user_type_id2xmlid)
-        company = self.env.user.company_id
+        company = self.env.company
         # pre-load odoo's chart of account
         odoo_chart = {}
         accounts = self.search([("company_id", "=", company.id)])
