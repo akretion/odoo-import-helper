@@ -68,6 +68,9 @@ In the sample code above, ``vals`` is the dictionary that will be passed to ``cr
 - it can contain an **'iban'** key, that will be replaced by **'bank_ids': [(0, 0, {'acc_number': xxx})]** if the IBAN is valid,
 - along with the 'iban' key, it can contain a **'bic'** key and a **'bank_name'** key that will be replaced by **'bank_ids': [(0, 0, {'acc_number': xxxx, 'bank_id': bank_id})]**. The bank will be created on the fly if the BIC is not already present in the Odoo database, unless ``create_bank=False`` is passed as argument of the method ``_create_partner()``,
 - it can contain a **'siren_or_siret'** key, that can contain either a SIREN or a SIRET.
+- it can contain a key **'customer_invoice_transmit_method_code'** or **'supplier_invoice_transmit_method_code'** that contain the code of an invoice transmit method,
+- it can contain a key **'customer_payment_term_code'** or **'supplier_payment_term_code'** that contain the code given by this module to a payment term. Current codes : 1 (immediate payment), 15 (15 days net), 21 (21 days net), 30, 45, 60.
+- it can contain a key **'comment_txt'** with a block of text, that will be converted to an HTML block with proper breaks for the **'comment'** field.
 
 For **child_ids**, use the old syntax *[(0, 0, child_vals)]* and not the new syntax *[Command.create(child_vals)]*.
 

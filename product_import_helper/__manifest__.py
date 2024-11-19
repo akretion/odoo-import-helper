@@ -11,7 +11,7 @@
     "author": " Akretion",
     "license": "AGPL-3",
     "depends": [
-        "stock",  # for stock levels...
+        "stock_account",  # for stock levels and accounts on products
         "import_helper_base",
         # account_product_fiscal_classification is now optional
     ],

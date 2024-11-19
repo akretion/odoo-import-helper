@@ -5,6 +5,7 @@
 from odoo import api, models, Command, _
 from odoo.exceptions import UserError
 from odoo.addons.phone_validation.tools import phone_validation
+from odoo.tools import plaintext2html
 
 import re
 import copy
@@ -79,6 +80,20 @@ class ImportHelper(models.TransientModel):
                     fp = fps[0]
                     speedy['fiscal_position']['frvattype2id'][fr_vat_type] = fp['id']
                     speedy['fiscal_position']['id2name'][fp['id']] = fp['name']
+        if "account.payment.term" in self.env:  # we don't depend on account
+            speedy['payment_term'] = {
+                1: self.env.ref('account.account_payment_term_immediate').id,
+                15: self.env.ref('account.account_payment_term_15days').id,
+                21: self.env.ref('account.account_payment_term_21days').id,
+                30: self.env.ref('account.account_payment_term_30days').id,
+                45: self.env.ref('account.account_payment_term_45days').id,
+                60: self.env.ref('account.account_payment_term_2months').id,  # WARN: not exactly 60days
+                }
+        if "transmit.method" in self.env:  # we don't depend on account_invoice_transmit_method
+            speedy['transmit_method'] = {}
+            methods = self.env['transmit.method'].with_context(active_test=False).search_read([], ['code'])
+            for method in methods:
+                speedy['transmit_method'][method['code']] = method['id']
         return speedy
 
     def _create_partner(self, vals, speedy, email_check_deliverability=True, create_bank=True):
@@ -459,12 +474,12 @@ class ImportHelper(models.TransientModel):
             if vat and country_id in speedy['eu_country_ids']:
                 expected_country_code = vat[:2]
                 if expected_country_code == 'EL':  # special case for Greece
-                    expected_country_code == 'GR'
+                    expected_country_code = 'GR'
                 elif expected_country_code == 'XI':  # Northern Ireland
                     expected_country_code = 'GB'
                 if expected_country_code != country_code:
                     speedy['logs']['res.partner'].append({
-                        'msg': "The country prefix of the VAT number doesn't match the country code '%s'" % country_code,
+                        'msg': f"Given the VAT number ({vat}), the country code should be '{expected_country_code}' but it is '{country_code}'",
                         'value': vat,
                         'vals': vals,
                         'field': 'res.partner,vat',
@@ -476,6 +491,71 @@ class ImportHelper(models.TransientModel):
                     'vals': vals,
                     'field': 'res.partner.bank,acc_number',
                     })
+        # Transmit method
+        if speedy.get('transmit_method'):
+            if vals.get('customer_invoice_transmit_method_code'):
+                if vals['customer_invoice_transmit_method_code'] in speedy['transmit_method']:
+                    vals['customer_invoice_transmit_method_id'] = speedy['transmit_method'][vals['customer_invoice_transmit_method_code']]
+                else:
+                    speedy['logs']['res.partner'].append({
+                        'msg': "Invoice transmit method code '%s' doesn't exist" % vals['customer_invoice_transmit_method_code'],
+                        'value': vals['customer_invoice_transmit_method_code'],
+                        'vals': vals,
+                        'field': 'res.partner,customer_invoice_transmit_method_id',
+                        'reset': True,
+                        })
+            if vals.get('supplier_invoice_transmit_method_code'):
+                if vals['supplier_invoice_transmit_method_code'] in speedy['transmit_method']:
+                    vals['supplier_invoice_transmit_method_id'] = speedy['transmit_method'][vals['supplier_invoice_transmit_method_code']]
+                else:
+                    speedy['logs']['res.partner'].append({
+                        'msg': "Invoice transmit method code '%s' doesn't exist" % vals['supplier_invoice_transmit_method_code'],
+                        'value': vals['supplier_invoice_transmit_method_code'],
+                        'vals': vals,
+                        'field': 'res.partner,supplier_invoice_transmit_method_id',
+                        'reset': True,
+                        })
+        # Payment terms
+        if speedy.get('payment_term'):
+            if vals.get('customer_payment_term_code'):
+                if vals['customer_payment_term_code'] in speedy['payment_term']:
+                    vals['property_payment_term_id'] = speedy['payment_term'][vals['customer_payment_term_code']]
+                else:
+                    # try to convert to int
+                    try:
+                        customer_payment_term_int = int(vals['customer_payment_term_code'])
+                    except:
+                        customer_payment_term_int = None
+                    if customer_payment_term_int in speedy['payment_term']:
+                        vals['property_payment_term_id'] = speedy['payment_term'][customer_payment_term_int]
+                    else:
+                        speedy['logs']['res.partner'].append({
+                            'msg': "Payment term code '%s' doesn't exist" % vals['customer_payment_term_code'],
+                            'value': vals['customer_payment_term_code'],
+                            'vals': vals,
+                            'field': 'res.partner,property_payment_term_id',
+                            'reset': True,
+                            })
+            if vals.get('supplier_payment_term_code'):
+                if vals['supplier_payment_term_code'] in speedy['payment_term']:
+                    vals['property_payment_term_id'] = speedy['payment_term'][vals['supplier_payment_term_code']]
+                else:
+                    # try to convert to int
+                    try:
+                        supplier_payment_term_int = int(vals['supplier_payment_term_code'])
+                    except:
+                        supplier_payment_term_int = None
+                    if supplier_payment_term_int in speedy['payment_term']:
+                        vals['property_supplier_payment_term_id'] = speedy['payment_term'][supplier_payment_term_int]
+                    else:
+                        speedy['logs']['res.partner'].append({
+                            'msg': "Payment term code '%s' doesn't exist" % vals['supplier_payment_term_code'],
+                            'value': vals['supplier_payment_term_code'],
+                            'vals': vals,
+                            'field': 'res.partner,property_supplier_payment_term_id',
+                            'reset': True,
+                            })
+
         # FISCAL POSITION for France
         if (
                 hasattr(self.env['res.partner'], 'property_account_position_id') and
@@ -496,6 +576,9 @@ class ImportHelper(models.TransientModel):
                     vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['intracom_b2c']
             else:
                 vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['extracom']
+        # Comment txt -> html
+        if vals.get('comment_txt'):
+            vals['comment'] = plaintext2html(vals['comment_txt'])
         # vals will keep the original keys
         # rvals will be used for create(), so we need to remove all the keys are don't exist on res.partner
         rvals = copy.deepcopy(vals)
@@ -506,7 +589,12 @@ class ImportHelper(models.TransientModel):
         return rvals
 
     def _remove_technical_keys(self, rvals):
-        for key in ['line', 'create_date', 'iban', 'bic', 'siren_or_siret', 'title_code', 'country_name']:
+        keys_to_remove = [
+            'line', 'create_date', 'iban', 'bic',
+            'siren_or_siret', 'title_code', 'country_name', 'comment_txt',
+            'customer_invoice_transmit_method_code', 'supplier_invoice_transmit_method_code',
+            'customer_payment_term_code', 'supplier_payment_term_code']
+        for key in keys_to_remove:
             if key in rvals:
                 rvals.pop(key)
         if not hasattr(self.env['res.partner'], 'siren') and 'siren' in rvals:
@@ -551,9 +639,9 @@ class ImportHelper(models.TransientModel):
                 'value': email,
                 'vals': vals,
                 'field': 'res.partner,email',
-                'reset': True,
+#                'reset': True,
                 })
-            email = False
+#            email = False
         return email
 
     def _prepare_res_bank(self, vals, speedy):

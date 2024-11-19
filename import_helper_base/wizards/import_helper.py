@@ -39,6 +39,7 @@ class ImportHelper(models.TransientModel):
                     "etatsunis": "US",
                     "grandebretagne": "GB",
                     "angleterre": "GB",
+                    "ilemaurice": "MU",  # string is simply "Maurice' in Odoo
                     },
                 'code2id': {},
                 'id2code': {},  # used to check iban and vat number prefixes
