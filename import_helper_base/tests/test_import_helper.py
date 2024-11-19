@@ -40,5 +40,6 @@ class TestBaseImportHelper(TransactionCase):
         )
         self.assertEqual(country_id, self.env.ref("base.us").id)
         # country_id = iho._match_country(
-        #    {"country_name": "España"}, "country_name", "res.partner", "country_id", speedy)
+        #    {"country_name": "España"}, "country_name", "res.partner",
+        # "country_id", speedy)
         # self.assertEqual(country_id, self.env.ref('base.es').id)

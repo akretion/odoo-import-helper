@@ -85,7 +85,8 @@ class ImportHelper(models.TransientModel):
             if not openai_api_key:
                 raise UserError(
                     _(
-                        "Missing entry openai_api_key in the Odoo server configuration file."
+                        "Missing entry openai_api_key in the Odoo server "
+                        "configuration file."
                     )
                 )
             speedy["openai_client"] = OpenAI(api_key=openai_api_key)
@@ -134,7 +135,7 @@ class ImportHelper(models.TransientModel):
             "No direct match for country '%s': now asking ChatGPT.", country_name
         )
         # ask ChatGPT !
-        content = """ISO country code of "%s", nothing else""" % country_name
+        content = f"""ISO country code of "{country_name}", nothing else"""
         logger.debug("ChatGPT question: %s", content)
         chat_completion = speedy["openai_client"].chat.completions.create(
             model="gpt-3.5-turbo",
@@ -153,17 +154,21 @@ class ImportHelper(models.TransientModel):
             if len(answer) == 2:
                 country_code = answer.upper()
                 if country_code in cyd["code2id"]:
+                    cyd_code2n_cntry = cyd["code2name"][country_code]
                     logger.info(
                         "ChatGPT matched country '%s' to %s (%s)",
                         country_name,
-                        cyd["code2name"][country_code],
+                        cyd_code2n_cntry,
                         country_code,
                     )
                     speedy["logs"][model].append(
                         dict(
                             log,
-                            msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which matched to '%s'"
-                            % (country_code, cyd["code2name"][country_code]),
+                            msg=(
+                                "Country name could not be found in Odoo. "
+                                f"ChatGPT said ISO code was '{country_code}', "
+                                f"which matched to '{cyd_code2n_cntry}'"
+                            ),
                         )
                     )
                     country_id = cyd["code2id"][country_code]
@@ -173,8 +178,11 @@ class ImportHelper(models.TransientModel):
                     speedy["logs"][model].append(
                         dict(
                             log,
-                            msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which didn't match to any country"
-                            % country_code,
+                            msg=(
+                                "Country name could not be found in Odoo. "
+                                f"ChatGPT said ISO code was '{country_code}', "
+                                "which didn't match to any country"
+                            ),
                         ),
                         reset=True,
                     )
@@ -182,8 +190,8 @@ class ImportHelper(models.TransientModel):
                 speedy["logs"][model].append(
                     dict(
                         log,
-                        msg="ChatGPT didn't answer a 2 letter country code but '%s'"
-                        % answer,
+                        msg="ChatGPT didn't answer a 2 letter country code "
+                        f"but '{answer}'",
                         reset=True,
                     )
                 )
@@ -207,23 +215,22 @@ class ImportHelper(models.TransientModel):
             if ofield:
                 speedy["field2label"][field] = ofield.field_description
             else:
-                speedy["field2label"][field] = "%s (%s)" % (
-                    field_split[1],
-                    field_split[0],
-                )
+                speedy["field2label"][field] = f"{field_split[1]} ({field_split[0]})"
         return speedy["field2label"][field]
 
     def _convert_logs2html(self, speedy):
-        html = '<p><small>For the logs in <span style="color: red">red</span>, the data was <b>not imported</b> in Odoo</small><br/>'
+        html = (
+            '<p><small>For the logs in <span style="color: red">red</span>, '
+            "the data was <b>not imported</b> in Odoo</small><br/>"
+        )
         if speedy.get("aiengine") == "chatgpt":
-            html += (
-                "<small><b>%d</b> OpenAI tokens where used</small></p>"
-                % speedy["openai_tokens"]
+            html += "<small><b>{}</b> OpenAI tokens where used</small></p>".format(
+                speedy["openai_tokens"]
             )
         for obj_name, log_list in speedy["logs"].items():
             obj_rec = self.env["ir.model"].search([("model", "=", obj_name)], limit=1)
             assert obj_rec
-            html += '<h1 style="color:darkblue;">%s</h1>' % obj_rec.name
+            html += f'<h1 style="color:darkblue;">{obj_rec.name}</h1>'
             line2logs = defaultdict(list)
             field2logs = defaultdict(list)
             for log in log_list:
@@ -236,43 +243,42 @@ class ImportHelper(models.TransientModel):
                 log_labels = []
                 for log in logs:
                     log_labels.append(
-                        '<li style="color: %s"><b>%s</b>: <b>%s</b> - %s</li>'
-                        % (
+                        '<li style="color: {}"><b>{}</b>: <b>{}</b> - {}</li>'.format(
                             log.get("reset") and "red" or "black",
                             self._field_label(log["field"], speedy),
                             log["value"],
                             log["msg"],
                         )
                     )
-                h3 = "Line %s" % line
+                h3 = f"Line {line}"
                 if log["vals"].get("id"):
-                    h3 += ": %s (ID %d)" % (
-                        log["vals"]["display_name"],
-                        log["vals"]["id"],
-                    )
-                html += "<h3>%s</h3>\n<p><ul>%s</ul></p>" % (h3, "\n".join(log_labels))
+                    h3 += f": {log['vals']['display_name']} (ID {log['vals']['id']})"
+                html += "<h3>{}</h3>\n<p><ul>{}</ul></p>".format(
+                    h3, "\n".join(log_labels)
+                )
             html += '<h2 style="color:darkgreen;">Logs per field</h2>'
             for field, logs in field2logs.items():
                 log_labels = []
                 for log in logs:
-                    line_label = "Line %s" % log["vals"].get("line", "unknown")
+                    line_label = f"Line {log['vals'].get('line', 'unknown')}"
                     if log["vals"].get("id"):
-                        line_label += " (%s ID %d)" % (
-                            log["vals"]["display_name"],
-                            log["vals"]["id"],
-                        )
+                        line_label += " (%(display_name)s ID %(id)d)" % {
+                            "display_name": log["vals"]["display_name"],
+                            "id": log["vals"]["id"],
+                        }
                     log_labels.append(
-                        '<li style="color: %s"><b>%s</b>: <b>%s</b> - %s</li>'
-                        % (
+                        (
+                            '<li style="color: {}"><b>{}</b>: ' "<b>{}</b> - {}</li>"
+                        ).format(
                             log.get("reset") and "red" or "black",
                             line_label,
                             log["value"],
                             log["msg"],
                         )
                     )
-                html += "<h3>%s</h3>\n<p><ul>%s</ul></p>" % (
-                    self._field_label(field, speedy),
-                    "\n".join(log_labels),
+                html += (
+                    f"<h3>{self._field_label(field, speedy)}</h3>\n<p><ul>"
+                    "{'\n'.join(log_labels)}</ul></p>"
                 )
         return html
 
@@ -298,8 +304,7 @@ class ImportHelper(models.TransientModel):
             except Exception as e:
                 speedy["logs"].append(
                     {
-                        "msg": "Failed to convert '%s' to datetime: %s"
-                        % (create_date, e),
+                        "msg": f"Failed to convert '{create_date}' to datetime: {e}",
                         "value": vals["create_date"],
                         "vals": vals,
                         "field": "product.product,create_date",
@@ -311,7 +316,7 @@ class ImportHelper(models.TransientModel):
         if create_date_dt and create_date_dt.date() > fields.Date.context_today(self):
             speedy["logs"].append(
                 {
-                    "msg": "create_date %s cannot be in the future" % create_date_dt,
+                    "msg": f"create_date {create_date_dt} cannot be in the future",
                     "value": create_date,
                     "vals": vals,
                     "field": "product.product,create_date",
