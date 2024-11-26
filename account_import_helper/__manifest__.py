@@ -16,5 +16,5 @@
         "security/ir.model.access.csv",
         "wizard/account_chart_generate_view.xml",
     ],
-    "installable": True,
+    "installable": False,
 }

@@ -27,5 +27,5 @@ I developped this module for a project with many companies where the accountant 
         "security/ir.model.access.csv",
         "wizards/account_default_ir_property_view.xml",
     ],
-    "installable": True,
+    "installable": False,
 }

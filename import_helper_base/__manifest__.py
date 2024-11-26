@@ -18,5 +18,5 @@
         'security/ir.model.access.csv',
         'wizards/import_helper_view.xml',
         ],
-    'installable': True,
+    'installable': False,
 }

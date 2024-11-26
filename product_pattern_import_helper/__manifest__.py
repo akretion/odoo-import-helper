@@ -10,7 +10,6 @@
     "website": "https://github.com/akretion/odoo-import-helper",
     "author": " Akretion",
     "license": "AGPL-3",
-    "application": False,
     "installable": False,
     "external_dependencies": {
         "python": [],
