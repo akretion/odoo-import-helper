@@ -51,7 +51,7 @@ Here is some sample code:
               'type': 'contact',
               'name': row[12],
               'phone': row[13],
-              'moile': row[14],
+              'mobile': row[14],
               })]
           }
       import_obj._create_partner(vals, speedy)
