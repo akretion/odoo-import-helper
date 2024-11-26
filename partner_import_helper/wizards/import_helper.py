@@ -326,7 +326,8 @@ class ImportHelper(models.TransientModel):
                     elif create_bank:
                         bank = self.env['res.bank'].create(
                             self._prepare_res_bank(vals, speedy))
-                        speedy['bank']['bic2id'][bic] = bank.id
+                        bank_id = bank.id
+                        speedy['bank']['bic2id'][bic] = bank_id
                         speedy['bank']['bic2name'][bic] = bank.name
                         speedy['logs']['res.partner'].append({
                             'msg': "BIC not found in Odoo. New bank named '%s' created (ID %d)" % (bank.name, bank.id),
@@ -466,8 +467,6 @@ class ImportHelper(models.TransientModel):
                 indus = self.env['res.partner.industry'].create(self._prepare_industry(vals, speedy))
                 speedy['industry_name2id'][vals['industry_name']] = indus.id
             vals['industry_id'] = speedy['industry_name2id'][vals['industry_name']]
-        if 'industry_name' in vals:
-            vals.pop('industry_name')
         if country_id:
             country_code = speedy['country']['id2code'][country_id]
             # TODO Northern Ireland doesn't pass this check
@@ -538,7 +537,7 @@ class ImportHelper(models.TransientModel):
                             })
             if vals.get('supplier_payment_term_code'):
                 if vals['supplier_payment_term_code'] in speedy['payment_term']:
-                    vals['property_payment_term_id'] = speedy['payment_term'][vals['supplier_payment_term_code']]
+                    vals['property_supplier_payment_term_id'] = speedy['payment_term'][vals['supplier_payment_term_code']]
                 else:
                     # try to convert to int
                     try:
@@ -590,7 +589,7 @@ class ImportHelper(models.TransientModel):
 
     def _remove_technical_keys(self, rvals):
         keys_to_remove = [
-            'line', 'create_date', 'iban', 'bic',
+            'line', 'create_date', 'iban', 'bic', 'bank_name', 'industry_name',
             'siren_or_siret', 'title_code', 'country_name', 'comment_txt',
             'customer_invoice_transmit_method_code', 'supplier_invoice_transmit_method_code',
             'customer_payment_term_code', 'supplier_payment_term_code']
