@@ -87,13 +87,7 @@ class ImportHelper(models.TransientModel):
                 21: self.env.ref('account.account_payment_term_21days').id,
                 30: self.env.ref('account.account_payment_term_30days').id,
                 45: self.env.ref('account.account_payment_term_45days').id,
-                60: self.env.ref('account.account_payment_term_2months').id,  # WARN: not exactly 60days
                 }
-        if "transmit.method" in self.env:  # we don't depend on account_invoice_transmit_method
-            speedy['transmit_method'] = {}
-            methods = self.env['transmit.method'].with_context(active_test=False).search_read([], ['code'])
-            for method in methods:
-                speedy['transmit_method'][method['code']] = method['id']
         return speedy
 
     def _create_partner(self, vals, speedy, email_check_deliverability=True, create_bank=True):
@@ -326,7 +320,8 @@ class ImportHelper(models.TransientModel):
                     elif create_bank:
                         bank = self.env['res.bank'].create(
                             self._prepare_res_bank(vals, speedy))
-                        speedy['bank']['bic2id'][bic] = bank.id
+                        bank_id = bank.id
+                        speedy['bank']['bic2id'][bic] = bank_id
                         speedy['bank']['bic2name'][bic] = bank.name
                         speedy['logs']['res.partner'].append({
                             'msg': "BIC not found in Odoo. New bank named '%s' created (ID %d)" % (bank.name, bank.id),
@@ -466,8 +461,6 @@ class ImportHelper(models.TransientModel):
                 indus = self.env['res.partner.industry'].create(self._prepare_industry(vals, speedy))
                 speedy['industry_name2id'][vals['industry_name']] = indus.id
             vals['industry_id'] = speedy['industry_name2id'][vals['industry_name']]
-        if 'industry_name' in vals:
-            vals.pop('industry_name')
         if country_id:
             country_code = speedy['country']['id2code'][country_id]
             # TODO Northern Ireland doesn't pass this check
@@ -491,30 +484,6 @@ class ImportHelper(models.TransientModel):
                     'vals': vals,
                     'field': 'res.partner.bank,acc_number',
                     })
-        # Transmit method
-        if speedy.get('transmit_method'):
-            if vals.get('customer_invoice_transmit_method_code'):
-                if vals['customer_invoice_transmit_method_code'] in speedy['transmit_method']:
-                    vals['customer_invoice_transmit_method_id'] = speedy['transmit_method'][vals['customer_invoice_transmit_method_code']]
-                else:
-                    speedy['logs']['res.partner'].append({
-                        'msg': "Invoice transmit method code '%s' doesn't exist" % vals['customer_invoice_transmit_method_code'],
-                        'value': vals['customer_invoice_transmit_method_code'],
-                        'vals': vals,
-                        'field': 'res.partner,customer_invoice_transmit_method_id',
-                        'reset': True,
-                        })
-            if vals.get('supplier_invoice_transmit_method_code'):
-                if vals['supplier_invoice_transmit_method_code'] in speedy['transmit_method']:
-                    vals['supplier_invoice_transmit_method_id'] = speedy['transmit_method'][vals['supplier_invoice_transmit_method_code']]
-                else:
-                    speedy['logs']['res.partner'].append({
-                        'msg': "Invoice transmit method code '%s' doesn't exist" % vals['supplier_invoice_transmit_method_code'],
-                        'value': vals['supplier_invoice_transmit_method_code'],
-                        'vals': vals,
-                        'field': 'res.partner,supplier_invoice_transmit_method_id',
-                        'reset': True,
-                        })
         # Payment terms
         if speedy.get('payment_term'):
             if vals.get('customer_payment_term_code'):
@@ -538,7 +507,7 @@ class ImportHelper(models.TransientModel):
                             })
             if vals.get('supplier_payment_term_code'):
                 if vals['supplier_payment_term_code'] in speedy['payment_term']:
-                    vals['property_payment_term_id'] = speedy['payment_term'][vals['supplier_payment_term_code']]
+                    vals['property_supplier_payment_term_id'] = speedy['payment_term'][vals['supplier_payment_term_code']]
                 else:
                     # try to convert to int
                     try:
@@ -590,9 +559,8 @@ class ImportHelper(models.TransientModel):
 
     def _remove_technical_keys(self, rvals):
         keys_to_remove = [
-            'line', 'create_date', 'iban', 'bic',
+            'line', 'create_date', 'iban', 'bic', 'bank_name', 'industry_name',
             'siren_or_siret', 'title_code', 'country_name', 'comment_txt',
-            'customer_invoice_transmit_method_code', 'supplier_invoice_transmit_method_code',
             'customer_payment_term_code', 'supplier_payment_term_code']
         for key in keys_to_remove:
             if key in rvals:

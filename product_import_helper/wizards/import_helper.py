@@ -63,7 +63,7 @@ class ImportHelper(models.TransientModel):
             if product['default_code']:
                 speedy['product_default_code2name'][product['default_code']] = '%s (ID %d)' % (product['display_name'], product['id'])
         accounts = self.env["account.account"].search_read(
-            [("company_id", "=", self.env.company.id), ("deprecated", "=", False)], ["code"])
+            [("deprecated", "=", False)], ["code"])
         for account in accounts:
             speedy["account_code2id"][account["code"]] = account["id"]
         route_code2xmlid = {
@@ -105,7 +105,7 @@ class ImportHelper(models.TransientModel):
             speedy['product_default_code2name'][product.default_code] = '%s (ID %d)' % (vals['display_name'], vals['id'])
         logger.info('New product created: %s ID %d from line %d', product.display_name, product.id, vals['line'])
         if inventory and stock_qty:
-            if product.type == 'product':
+            if product.is_storable:
                 self._set_stock_level(product, stock_qty, location_id, speedy)
             else:
                 speedy['logs']['product.product'].append({

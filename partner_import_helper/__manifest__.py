@@ -4,7 +4,7 @@
 
 {
     'name': 'Partner Import Helper',
-    'version': '16.0.1.0.0',
+    'version': '18.0.1.0.0',
     'category': 'Extra Tools',
     'license': 'AGPL-3',
     'summary': 'Helper methods to import partners',
@@ -15,5 +15,5 @@
         'phone_validation',  # would be nice to avoid depending on it ?
         ],
     "external_dependencies": {"python" : ["email-validator"]},
-    'installable': False,
+    'installable': True,
 }
