@@ -4,7 +4,7 @@
 
 {
     "name": "Account Import Helper",
-    "version": "16.0.1.0.0",
+    "version": "18.0.1.0.0",
     "category": "Partner",
     "license": "AGPL-3",
     "summary": "Helper methods to import accounting-related data",
@@ -16,5 +16,5 @@
         "security/ir.model.access.csv",
         "wizard/account_chart_generate_view.xml",
     ],
-    "installable": False,
+    "installable": True,
 }
