@@ -49,7 +49,7 @@ class ResCompany(models.Model):
         logger.info("taxtemplate2xmlid = %s", taxtemplate2xmlid)
         # pre-load odoo's chart of account
         odoo_chart = {}
-        accounts = self.env['account.account'].search([("company_id", "=", self.id)])
+        accounts = self.env['account.account'].search([("company_ids", "in", [self.id])])
         odoo_code_size = False
         for account in accounts:
             taxes_xmlids = [taxtemplate2xmlid[tax.id] for tax in account.tax_ids]
