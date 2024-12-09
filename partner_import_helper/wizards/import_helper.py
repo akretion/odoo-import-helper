@@ -31,6 +31,7 @@ class ImportHelper(models.TransientModel):
             "o2m_phone": hasattr(self.env['res.partner'], 'phone_ids'),
             "eu_country_ids": self.env.ref('base.europe').country_ids.ids,
             "fr_country_id": self.env.ref('base.fr').id,
+            "mc_country_id": self.env.ref('base.mc').id,
             "bank": {
                 'bic2id': {},
                 'bic2name': {},
@@ -529,8 +530,11 @@ class ImportHelper(models.TransientModel):
         if (
                 hasattr(self.env['res.partner'], 'property_account_position_id') and
                 speedy['fiscal_position'].get('frvattype2id') and country_id):
-            if country_id == speedy['fr_country_id']:
+            if country_id in (speedy['fr_country_id'], speedy['mc_country_id']):
                 vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['france']
+                # DOMs
+                if vals.get('zip') and len(vals['zip')) == 5 and vals['zip'].startswith('97'):
+                    vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['extracom']
             elif country_id in speedy['eu_country_ids']:
                 if vals.get('is_company'):
                     vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['intracom_b2b']
