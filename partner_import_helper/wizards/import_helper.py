@@ -533,7 +533,7 @@ class ImportHelper(models.TransientModel):
             if country_id in (speedy['fr_country_id'], speedy['mc_country_id']):
                 vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['france']
                 # DOMs
-                if vals.get('zip') and len(vals['zip')) == 5 and vals['zip'].startswith('97'):
+                if vals.get('zip') and len(vals['zip']) == 5 and vals['zip'].startswith('97'):
                     vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['extracom']
             elif country_id in speedy['eu_country_ids']:
                 if vals.get('is_company'):
