@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_import_helper_generic_full,Full access on import.helper.generic wizard,model_import_helper_generic,base.group_user,1,1,1,1

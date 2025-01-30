@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="import_form_helper_generic" model="ir.ui.view">
+        <field name="name">generic custom Scripts import</field>
+        <field name="model">import.helper.generic</field>
+        <field name="arch" type="xml">
+      <form string="Import generic">
+        <group name="Files" string="Import file" col="2">
+            <field name="file_import" string="xlsx file"/>
+        </group>
+                <group name="main" col="3">
+                    <button name="partner_import_generic" type="object" string="Partner import"/>
+                </group>
+            </form>
+        </field>
+  </record>
+
+    <record id="action_import_helper" model="ir.actions.act_window">
+        <field name="name">Import base</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">import.helper.generic</field>
+        <field name="view_id" ref="import_form_helper_generic"/>
+  </record>
+
+    <menuitem
+        action="action_import_helper"
+        id="menu_action_import_helper"
+        sequence="20"
+        name="Import helper"
+        groups="base.group_erp_manager"
+        />
+
+</odoo>
+
+
