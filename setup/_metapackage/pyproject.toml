@@ -1,0 +1,11 @@
+[project]
+name = "odoo-addons-akretion-odoo-import-helper"
+version = "17.0.20250130.0"
+dependencies = [
+    "odoo-addon-account_import_helper>=17.0dev,<17.1dev",
+]
+classifiers=[
+    "Programming Language :: Python",
+    "Framework :: Odoo",
+    "Framework :: Odoo :: 17.0",
+]
