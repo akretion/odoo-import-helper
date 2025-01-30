@@ -21,12 +21,12 @@ Available addons
 ----------------
 addon | version | maintainers | summary
 --- | --- | --- | ---
-[account_balance_reset](account_balance_reset/) | 14.0.1.0.0 |  | Rest accounting balance at a particular date
-[account_import_helper](account_import_helper/) | 14.0.1.0.0 |  | Helper methods to import accounting-related data
-[account_ir_property_helper](account_ir_property_helper/) | 14.0.1.0.0 |  | Helper methods to create/update default ir.property for accounting
+[account_balance_reset](account_balance_reset/) | 14.0.1.0.1 |  | Rest accounting balance at a particular date
+[account_import_helper](account_import_helper/) | 14.0.1.0.1 |  | Helper methods to import accounting-related data
+[account_ir_property_helper](account_ir_property_helper/) | 14.0.1.0.1 |  | Helper methods to create/update default ir.property for accounting
 [product_import_helper](product_import_helper/) | 14.0.1.0.0 |  | Helper for importing product
 [product_pattern_import_helper](product_pattern_import_helper/) | 14.0.1.0.0 |  | Helper for importing product using pattern import export
-[shopinvader_url_import](shopinvader_url_import/) | 14.0.1.0.0 |  | Allow to import url in shopinvader
+[shopinvader_url_import](shopinvader_url_import/) | 14.0.1.0.1 |  | Allow to import url in shopinvader
 
 [//]: # (end addons)
 
