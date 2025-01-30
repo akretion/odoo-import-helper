@@ -110,7 +110,7 @@ class AccountBalanceRest(models.TransientModel):
             rec_domain = [
                 ("account_id", "=", line.account_id.id),
                 ("partner_id", "=", line.partner_id.id or False),
-                ("full_reconcile_id", "=", False),
+                ("reconciled", "=", False),
                 ("date", "<=", self.date),
                 ("company_id", "=", company_id),
             ]
@@ -121,7 +121,13 @@ class AccountBalanceRest(models.TransientModel):
             balance = rec_rg[0]["balance"]
             if ccur.is_zero(balance):
                 lines = amlo.search(rec_domain)
-                lines.reconcile()
+                # doing a reconcile will do a write on the field full_reconcile_id and
+                # the write will always trigger the synchronisation of business field
+                # this is useless as we just do a reconcilisation !
+                # it can also raise error on old move where the journal
+                # config have been updated
+                # so let's use skip_account_move_synchronization
+                lines.with_context(skip_account_move_synchronization=True).reconcile()
                 logger.info(
                     "Reconciled %d lines for account %s partner %s",
                     len(lines),
