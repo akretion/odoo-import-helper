@@ -50,7 +50,7 @@ class AccountBalanceRest(models.TransientModel):
             raise UserError(_(
                 "There are %d draft journal entries dated before %s.") % (
                     draft_count, format_date(self.env, self.date)))
-        domain += [('parent_state', '=', 'posted'), ('display_type', '=', False)]
+        domain += [('parent_state', '=', 'posted'), ('display_type', 'not in', ('line_section', 'line_note'))]
         rg_res = amlo.read_group(
             domain,
             ['account_id', 'partner_id', 'balance'],
@@ -94,6 +94,7 @@ class AccountBalanceRest(models.TransientModel):
             rec_domain = [
                 ('account_id', '=', line.account_id.id),
                 ('partner_id', '=', line.partner_id.id or False),
+                ('reconciled', '=', False),
                 ('full_reconcile_id', '=', False),
                 ('date', '<=', self.date),
                 ('company_id', '=', company_id),
