@@ -529,7 +529,8 @@ class ImportHelper(models.TransientModel):
         # FISCAL POSITION for France
         if (
                 hasattr(self.env['res.partner'], 'property_account_position_id') and
-                speedy['fiscal_position'].get('frvattype2id') and country_id):
+                speedy['fiscal_position'].get('frvattype2id') and country_id and not
+                vals.get("property_account_position_id")):
             if country_id in (speedy['fr_country_id'], speedy['mc_country_id']):
                 vals['property_account_position_id'] = speedy['fiscal_position']['frvattype2id']['france']
                 # DOMs
