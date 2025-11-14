@@ -67,7 +67,6 @@ class ImportHelper(models.TransientModel):
                     'france': False,
                     'france_vendor_vat_on_payment': False,  # not used for the moment
                     'intracom_b2b': False,
-                    'intracom_b2c': False,
                     'extracom': False,
                     }
                 for fr_vat_type in speedy['fiscal_position']['frvattype2id'].keys():
