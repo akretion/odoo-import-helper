@@ -6,16 +6,20 @@ from odoo.tests.common import TransactionCase
 from odoo import fields
 from odoo.tests import tagged
 
+from odoo.tools import file_open
+import base64
 
 @tagged('post_install', '-at_install')
 class PartnerImportHelper(TransactionCase):
+
+    XLSX_PATH = 'partner_import_helper/tests/res_partner_import_test.xlsx'
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.env = cls.env(context=dict(cls.env.context, tracking_disable=True))
 
-    def test_partner_import(self):
+    def test_partner_import_vals(self):
         vals = {
             'line': 1,
             'name': ' Akretion France ',
@@ -77,3 +81,21 @@ class PartnerImportHelper(TransactionCase):
         action = import_obj._result_action(speedy)
         self.assertTrue(isinstance(action, dict))
 
+    def test_partner_import_xlsx(self):
+        # open & submit file
+        file_res = file_open(self.XLSX_PATH, 'rb')
+        xlsx_file = file_res.read()
+        ImportHelper = self.env['import.helper']
+        wizard = ImportHelper.create({
+            'file': base64.b64encode(xlsx_file),
+        })
+
+        # test data
+        self.env.company.partner_id.ref = 'Holding'
+        action = wizard.button_import_partner()
+        self.assertTrue(isinstance(action, dict))
+
+        partner = self.env['res.partner'].search([('ref', '=', 'FRN001')])
+        self.assertTrue(partner)
+        self.assertEqual(len(partner.child_ids), 3)
+        self.assertEqual(len(partner.bank_ids), 1)

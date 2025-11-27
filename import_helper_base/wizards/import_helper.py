@@ -9,6 +9,7 @@ from datetime import datetime
 from unidecode import unidecode
 import re
 
+import traceback
 import logging
 logger = logging.getLogger(__name__)
 
@@ -115,19 +116,28 @@ class ImportHelper(models.TransientModel):
             return country_id
         logger.info("No direct match for country '%s': now asking ChatGPT.", country_name)
         # ask ChatGPT !
+        answer = None
         content = """ISO country code of "%s", nothing else""" % country_name
         logger.debug('ChatGPT question: %s', content)
-        chat_completion = speedy['openai_client'].chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": content}],
-            temperature=0,
-        )
+        try:
+            chat_completion = speedy['openai_client'].chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": content}],
+                temperature=0,
+            )
+            tokens = chat_completion.usage.total_tokens
+            logger.debug("%d tokens have been used", tokens)
+            speedy["openai_tokens"] += tokens
+            answer = chat_completion.choices[0].message.content
+        except Exception as e:
+            error = """
+                Error when asking this to Chatgpt: %s\n
+                It answered: %s
+            """ % (content, traceback.format_exc())
+            logger.warning(error)
+            speedy['logs'][model].append(dict(log, msg=error, reset=True))
 
         # print the chat completion
-        tokens = chat_completion.usage.total_tokens
-        logger.debug("%d tokens have been used", tokens)
-        speedy["openai_tokens"] += tokens
-        answer = chat_completion.choices[0].message.content
         if answer:
             answer = answer.strip()
             logger.info('ChatGPT answer: %s', answer)

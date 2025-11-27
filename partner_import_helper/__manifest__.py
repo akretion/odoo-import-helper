@@ -13,7 +13,10 @@
     'depends': [
         'import_helper_base',
         'phone_validation',  # would be nice to avoid depending on it ?
-        ],
-    "external_dependencies": {"python" : ["email-validator"]},
+    ],
+    'data': [
+        'wizards/import_helper_wizard.xml',
+    ],
+    "external_dependencies": {"python" : ["email-validator", "openpyxl", "openai"]},
     'installable': True,
 }

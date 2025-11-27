@@ -13,7 +13,7 @@
     """,
     'author': 'Akretion',
     'website': 'https://github.com/akretion/odoo-import-helper',
-    'depends': ['account'],
+    'depends': ['account', 'import_helper_base'],
     'data': [
         "wizards/account_balance_reset_view.xml",
         "security/ir.model.access.csv",

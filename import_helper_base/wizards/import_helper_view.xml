@@ -13,9 +13,16 @@
                     <field name="logs" nolabel="1" colspan="2" />
                 </group>
                 <footer>
-                    <button string="Close" class="btn-primary" special="cancel" />
+                    <button string="Discard" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
         </field>
     </record>
+
+    <menuitem
+        id="import_helper_parent_menu"
+        parent="base.menu_custom"
+        name="Import Helper"
+        sequence="-1"
+    />
 </odoo>
