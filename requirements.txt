@@ -1,0 +1,6 @@
+# generated from manifests external_dependencies
+email-validator
+openai
+openpyxl
+pycountry
+unidecode

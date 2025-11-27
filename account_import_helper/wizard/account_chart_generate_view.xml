@@ -5,68 +5,65 @@
   License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 -->
 <odoo>
-
-
-<record id="account_chart_generate_form" model="ir.ui.view">
-    <field name="name">account.chart.generate_form</field>
-    <field name="model">account.chart.generate</field>
-    <field name="arch" type="xml">
-        <form string="Generate chart of account">
-            <div name="help">
-                <p
-                        >Input XLSX file must have 3 columns:</p>
-                <ul><li>A. Account Code (field <em>code</em>, required)</li>
+    <record id="account_chart_generate_form" model="ir.ui.view">
+        <field name="name">account.chart.generate_form</field>
+        <field name="model">account.chart.generate</field>
+        <field name="arch" type="xml">
+            <form string="Generate chart of account">
+                <div name="help">
+                    <p>Input XLSX file must have 3 columns:</p>
+                    <ul>
+                        <li>A. Account Code (field <em>code</em>, required)</li>
                         <li>B. Account Name (field <em>name</em>, required)</li>
                         <li>C. Internal Notes (field <em>note</em>, optional)</li>
-        </ul>
-            </div>
-            <group name="main">
-                <field name="company_id" />
-                <field name="module" />
-                <field name="xmlid_prefix" />
-                <field name="fixed_size_code" />
-                <field name="with_taxes" />
-                <field name="input_file" filename="input_filename" />
-                <field name="input_filename" invisible="1" />
-                <field name="input_has_header_line"/>
-                <field name="out_csv_file" filename="out_csv_filename" invisible="1"/>
-                <field name="out_csv_filename" invisible="1" />
-            </group>
-            <footer>
-                <button
+                    </ul>
+                </div>
+                <group name="main">
+                    <field name="company_id" />
+                    <field name="module" />
+                    <field name="xmlid_prefix" />
+                    <field name="fixed_size_code" />
+                    <field name="with_taxes" />
+                    <field name="input_file" filename="input_filename" />
+                    <field name="input_filename" invisible="1" />
+                    <field name="input_has_header_line" />
+                    <field
+                        name="out_csv_file"
+                        filename="out_csv_filename"
+                        invisible="1"
+                    />
+                    <field name="out_csv_filename" invisible="1" />
+                </group>
+                <footer>
+                    <button
                         name="run"
                         type="object"
                         string="Generate"
                         class="btn-primary"
                     />
-                <button
-                        special="cancel"
-                        string="Close"
-                    />
-            </footer>
-        </form>
-    </field>
-</record>
+                    <button special="cancel" string="Close" />
+                </footer>
+            </form>
+        </field>
+    </record>
 
-<record id="account_chart_generate_action" model="ir.actions.act_window">
-    <field name="name">Chart Generate</field>
-    <field name="res_model">account.chart.generate</field>
-    <field name="view_mode">form</field>
-    <field name="target">new</field>
-</record>
+    <record id="account_chart_generate_action" model="ir.actions.act_window">
+        <field name="name">Chart Generate</field>
+        <field name="res_model">account.chart.generate</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
 
-<menuitem
+    <menuitem
         id="account_chart_generate_parent_menu"
         parent="base.menu_custom"
         name="Chart Generate"
         sequence="-1"
     />
 
-<menuitem
+    <menuitem
         id="account_chart_generate_menu"
         parent="account_chart_generate_parent_menu"
         action="account_chart_generate_action"
     />
-
-
 </odoo>
