@@ -6,7 +6,6 @@ from odoo.tests.common import TransactionCase
 
 
 class TestBaseImportHelper(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -14,20 +13,37 @@ class TestBaseImportHelper(TransactionCase):
         # create data
 
     def test_match_country(self):
-        iho = self.env['import.helper']
+        iho = self.env["import.helper"]
         speedy = iho._prepare_speedy()
         country_id = iho._match_country(
-            {"country_name": "fr"}, "country_name", "res.partner", "country_id", speedy)
-        self.assertEqual(country_id, self.env.ref('base.fr').id)
+            {"country_name": "fr"}, "country_name", "res.partner", "country_id", speedy
+        )
+        self.assertEqual(country_id, self.env.ref("base.fr").id)
         country_id = iho._match_country(
-            {"country_name": "FRA"}, "country_name", "res.partner", "country_id", speedy)
-        self.assertEqual(country_id, self.env.ref('base.fr').id)
+            {"country_name": "FRA"}, "country_name", "res.partner", "country_id", speedy
+        )
+        self.assertEqual(country_id, self.env.ref("base.fr").id)
         country_id = iho._match_country(
-            {"country_name": "France"}, "country_name", "res.partner", "country_id", speedy)
-        self.assertEqual(country_id, self.env.ref('base.fr').id)
+            {"country_name": "France"},
+            "country_name",
+            "res.partner",
+            "country_id",
+            speedy,
+        )
+        self.assertEqual(country_id, self.env.ref("base.fr").id)
         country_id = iho._match_country(
-            {"country_name": "U.S.A."}, "country_name", "res.partner", "country_id", speedy)
-        self.assertEqual(country_id, self.env.ref('base.us').id)
+            {"country_name": "U.S.A."},
+            "country_name",
+            "res.partner",
+            "country_id",
+            speedy,
+        )
+        self.assertEqual(country_id, self.env.ref("base.us").id)
         # country_id = iho._match_country(
-        #    {"country_name": "España"}, "country_name", "res.partner", "country_id", speedy)
+        #     {"country_name": "España"},
+        #     "country_name",
+        #     "res.partner",
+        #     "country_id",
+        #     speedy
+        # )
         # self.assertEqual(country_id, self.env.ref('base.es').id)

@@ -28,7 +28,7 @@ class ResCompany(models.Model):
         obj_id2xmlid = {}
         irmd = irmdo.search([("model", "=", object_name), ("res_id", "!=", False)])
         for entry in irmd:
-            obj_id2xmlid[entry.res_id] = "{}.{}".format(entry.module, entry.name)
+            obj_id2xmlid[entry.res_id] = f"{entry.module}.{entry.name}"
         return obj_id2xmlid
 
     def generate_custom_chart(
@@ -49,7 +49,9 @@ class ResCompany(models.Model):
         logger.info("taxtemplate2xmlid = %s", taxtemplate2xmlid)
         # pre-load odoo's chart of account
         odoo_chart = {}
-        accounts = self.env['account.account'].search([("company_ids", "in", [self.id])])
+        accounts = self.env["account.account"].search(
+            [("company_ids", "in", [self.id])]
+        )
         odoo_code_size = False
         for account in accounts:
             taxes_xmlids = [taxtemplate2xmlid[tax.id] for tax in account.tax_ids]
@@ -81,20 +83,30 @@ class ResCompany(models.Model):
                     if len(custom_code) != custom_code_size:
                         raise UserError(
                             _(
-                                "For account code %s, the size (%d) is different "
-                                "from the size of other accounts (%d)"
+                                "For account code %(custom_code)s, the size "
+                                "(%(custom_code_length)d) is different from the size "
+                                "of other accounts (%(custom_code_size)d)"
                             )
-                            % (custom_code, len(custom_code), custom_code_size)
+                            % {
+                                "custom_code": custom_code,
+                                "custom_code_length": len(custom_code),
+                                "custom_code_size": custom_code_size,
+                            }
                         )
                 else:
                     custom_code_size = len(custom_code)
                     if custom_code_size < odoo_code_size:
                         raise UserError(
                             _(
-                                "For account code %s, the custom code size (%d) "
-                                "is < odoo's code size (%d)"
+                                "For account code %(custom_code)s, the custom code "
+                                "size (%(custom_code_size)d) is < odoo's code size "
+                                "(%(odoo_code_size)d)"
                             )
-                            % (custom_code, custom_code_size, odoo_code_size)
+                            % {
+                                "custom_code": custom_code,
+                                "custom_code_size": custom_code_size,
+                                "odoo_code_size": odoo_code_size,
+                            }
                         )
                 size = odoo_code_size
             else:
@@ -108,11 +120,7 @@ class ResCompany(models.Model):
                 for odoo_code, odoo_dict in odoo_chart.items():
                     if odoo_code.startswith(short_matching_code):
                         custom_dict = odoo_dict.copy()
-                        custom_dict["id"] = "{}.{}{}".format(
-                            module,
-                            xmlid_prefix,
-                            custom_code,
-                        )
+                        custom_dict["id"] = f"{module}.{xmlid_prefix}{custom_code}"
                         custom_dict.update(src_custom_dict)
                         custom_dict["code"] = custom_code
                         if not with_taxes:
@@ -123,7 +131,10 @@ class ResCompany(models.Model):
                 size -= 1
             if not exit_while:
                 raise UserError(
-                    _("Customer account %s '%s' didn't match any Odoo account")
-                    % (custom_code, src_custom_dict.get("name"))
+                    _(
+                        "Customer account %(custom_code)s '%(name)s' didn't match any "
+                        "Odoo account"
+                    )
+                    % {"custom_code": custom_code, "name": src_custom_dict.get("name")}
                 )
         return res
