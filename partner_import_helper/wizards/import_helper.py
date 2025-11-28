@@ -87,6 +87,7 @@ class ImportHelper(models.TransientModel):
             'lang': 'fr_FR',
             'country_name': 'FRA',
         }
+    
     def _get_company_address_vals_default(self):
         return {
             'is_company': False,
