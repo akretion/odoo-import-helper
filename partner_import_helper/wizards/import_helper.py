@@ -94,6 +94,7 @@ class ImportHelper(models.TransientModel):
             'lang': 'fr_FR',
             'country_name': 'FRA',
         }
+    
     def _load_sheet_companies(self, speedy, headers, vals_list):
         """ Browse `companies` worksheet data in `vals_list`
              and call `_create_partner` to create companies and sub-addresses
