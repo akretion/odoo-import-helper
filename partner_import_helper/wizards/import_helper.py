@@ -80,6 +80,7 @@ class ImportHelper(models.TransientModel):
             :return: ['contact', 'invoice', 'delivery', 'other']
         """
         return [x[0] for x in self.env['res.partner']._fields['type'].selection]
+    
     def _get_company_vals_default(self):
         return {
             'is_company': True,
