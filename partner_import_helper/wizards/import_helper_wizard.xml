@@ -11,6 +11,13 @@
 
         <field name="arch" type="xml">
             <group name="main" position="inside">
+                <button name="%(action_partner_import_helper_download_template)d"
+                    type="action" icon="fa-download"
+                    class="mb-4 btn btn-secondary"
+                >
+                    Download XLSX template
+                </button>
+
                 <field name="file" />
             </group>
             <footer position="inside">
@@ -34,4 +41,11 @@
         parent="import_helper_base.import_helper_parent_menu"
         action="partner_import_helper_wizard_action"
     />
+
+    <!-- Action Download tempalte -->
+    <record id="action_partner_import_helper_download_template" model="ir.actions.act_url">
+        <field name="name">Download partner XLSX template</field>
+        <field name="url">/partner_import_helper/static/xls/partner_import_helper_template.xlsx</field>
+        <field name="target">download</field>
+    </record>
 </odoo>
