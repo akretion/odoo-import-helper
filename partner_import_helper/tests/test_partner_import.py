@@ -98,4 +98,4 @@ class PartnerImportHelper(TransactionCase):
         partner = self.env['res.partner'].search([('ref', '=', 'FRN001')])
         self.assertTrue(partner)
         self.assertEqual(len(partner.child_ids), 3)
-        self.assertEqual(len(partner.bank_ids), 1)
+        self.assertFalse(partner.bank_ids)

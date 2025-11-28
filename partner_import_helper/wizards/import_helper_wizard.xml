@@ -12,6 +12,7 @@
         <field name="arch" type="xml">
             <group name="main" position="inside">
                 <field name="file" />
+                <field name="ai_engine" />
             </group>
             <footer position="inside">
                 <button type="object"
