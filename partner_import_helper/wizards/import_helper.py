@@ -183,14 +183,18 @@ class ImportHelper(models.TransientModel):
             # creates banks, returns 'bank_ids' key in vals
             vals |= {'line': 'banks_%d' % row,}
             rvals = self._prepare_partner_vals(vals, speedy)
-            partner.write(rvals)
-            logger.info('Bank added: %s to partner %s from line %s', vals['iban'], partner.id, vals['line'])
+            if 'bank_ids' in rvals:
+                partner.write(rvals)
+                logger.info('Bank added: %s to partner %s from line %s', vals['iban'], partner.id, vals['line'])
+            else:
+                logger.info('Bank ignored: partner %s, line %s', partner.id, vals['line'])
+            
             row += 1
 
     # TODO add support for states
     @api.model
-    def _prepare_speedy(self, aiengine='chatgpt'):
-        speedy = super()._prepare_speedy(aiengine=aiengine)
+    def _prepare_speedy(self):
+        speedy = super()._prepare_speedy()
         speedy["logs"]["res.partner"] = []
         speedy.update({
             "o2m_phone": hasattr(self.env['res.partner'], 'phone_ids'),
