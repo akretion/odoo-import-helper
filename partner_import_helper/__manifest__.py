@@ -11,7 +11,9 @@
     'author': 'Akretion',
     'website': 'https://github.com/akretion/odoo-import-helper',
     'depends': [
+        'account',
         'import_helper_base',
+        'l10n_fr',
         'phone_validation',  # would be nice to avoid depending on it ?
     ],
     'data': [
