@@ -2,8 +2,7 @@
 Partner Import Helper
 =====================
 
-This module adds methods to help on the import of partners
- and a wizard accessible from Technical menu to import the .xlsx template suggested in *data* folder.
+This module adds methods to help on the import of partners and a wizard accessible from Technical menu to import the .xlsx template suggested in *data* folder.
 
 Example of helper methods for partners import:
 - help to match a country ID from a country name

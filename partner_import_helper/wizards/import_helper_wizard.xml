@@ -5,6 +5,12 @@
   License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 -->
 <odoo>
+    <record id="action_partner_import_helper_download_template" model="ir.actions.act_url">
+        <field name="name">Download partner XLSX template</field>
+        <field name="url">/partner_import_helper/static/xls/partner_import_helper_template.xlsx</field>
+        <field name="target">download</field>
+    </record>
+
     <record id="import_helper_form" model="ir.ui.view">
         <field name="model">import.helper</field>
         <field name="inherit_id" ref="import_helper_base.import_helper_form" />
@@ -42,11 +48,4 @@
         parent="import_helper_base.import_helper_parent_menu"
         action="partner_import_helper_wizard_action"
     />
-
-    <!-- Action Download tempalte -->
-    <record id="action_partner_import_helper_download_template" model="ir.actions.act_url">
-        <field name="name">Download partner XLSX template</field>
-        <field name="url">/partner_import_helper/static/xls/partner_import_helper_template.xlsx</field>
-        <field name="target">download</field>
-    </record>
 </odoo>
