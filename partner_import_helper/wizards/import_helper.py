@@ -105,7 +105,7 @@ class ImportHelper(models.TransientModel):
         }
         for vals in vals_list:
             if vals['ref']:
-                company_ref = vals['company_ref'].strip() or False if 'company_ref' in vals else self.env.company.partner_id.ref
+                company_ref = vals['company_ref'].strip() or False if 'company_ref' in headers else self.env.company.partner_id.ref
                 parent_id = speedy['partner_parent_ids'].get((vals['ref'], company_ref))
                 if not parent_id:
                     raise UserError(_("In `contacts` tab, parent ref %s not found in company %s", vals['ref'], company_ref))
@@ -128,7 +128,7 @@ class ImportHelper(models.TransientModel):
             for x in Partner.search([])
         }
         for vals in vals_list:
-            company_ref = vals['company_ref'].strip() or False if 'company_ref' in vals else self.env.company.partner_id.ref
+            company_ref = vals['company_ref'].strip() or False if 'company_ref' in headers else self.env.company.partner_id.ref
             partner = speedy['partners'].get((vals['ref'], company_ref))
             if not partner:
                 raise UserError(_("In `banks` tab, parent ref %s not found in company %s", vals['ref'], company_ref))
