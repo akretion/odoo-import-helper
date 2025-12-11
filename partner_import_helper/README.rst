@@ -24,13 +24,11 @@ The .xlsx should be cleaned before import, so all sheets is in standard Odoo imp
 * 1st row: fields name
 * 1st column: start of values
 The wizard will look at 3 sheets if they exists: *companies*, *contacts* and *banks*.
-The file can be personalized, if so the method `button_import_partner` should be inherited accordingly.
 
 Sample code
 ===========
 
 Here is some sample code.
-You may also check at the `button_import_partner` method, which uses similar code.
 
 .. code::
 

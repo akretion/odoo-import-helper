@@ -9,25 +9,32 @@ from datetime import datetime
 from unidecode import unidecode
 import re
 
+import base64, io
 import traceback
 import logging
 logger = logging.getLogger(__name__)
+
 
 try:
     import pycountry
 except ImportError:
     logger.debug('Cannot import pycountry')
+
 try:
     from openai import OpenAI
 except ImportError:
     logger.debug('Cannot import openai')
+
+try:
+    import openpyxl
+except ImportError:
+    logger.debug('Cannot import openpyxl')
 
 
 class ImportHelper(models.TransientModel):
     _name = "import.helper"
     _description = "Helper to import data in Odoo"
 
-    logs = fields.Html(readonly=True)
     ai_engine = fields.Selection(
         string='AI engine',
         selection=[('chatgpt', 'ChatGPT')],
@@ -35,7 +42,75 @@ class ImportHelper(models.TransientModel):
         help="If used, the import will send AI requests to improve data quality"
              "(only when helpful), like correcting country names into ISO country codes.",
     )
+    file = fields.Binary(string='File')
+    logs = fields.Html(readonly=True)
 
+    #====== File import methods ======#
+    def button_download_template(self):
+        url = self._context.get('template_path')
+        if url:
+            return {
+                'type': 'ir.actions.act_url',
+                'name': _('Download import template'),
+                'target': 'download',
+                'url': url,
+            }
+
+    def _get_sheet_names(self):
+        """ Sheet name of XLSX template
+            To inherit (e.g. in `partner_import_helper`, `product_import_helper`)
+        """
+        return []
+    
+    def button_import_file(self):
+        """ Button pressed by user, triggering the import methods """
+        # read xlsx
+        try:
+            bin_data = base64.b64decode(self.file)
+            data = io.BytesIO(bin_data)
+            workbook = openpyxl.load_workbook(data)
+        except ImportError:
+            logger.debug('Cannot open file. Maybe missing openpyxl requirement?')
+            return
+        
+        sheets = {name: workbook[name] for name in self._get_sheet_names() if name in workbook}
+
+        # load sheets and commit data to database
+        speedy = self._prepare_speedy()
+        for sheet_name, sheet in sheets.items():
+            method = '_load_sheet_' + sheet_name
+            if hasattr(self, method):
+                logger.info("Loading sheet: %s", sheet_name)
+                headers, vals_list = self._sheet_to_dict(sheet)
+                getattr(self, method)(speedy, headers, vals_list)
+            else:
+                logger.warning("Sheet ignored: %s", sheet_name)
+        
+        return self._result_action(speedy)
+
+    def _sheet_to_dict(self, worksheet):
+        """ Transform `worksheet` into a `vals_list` """
+        # Get headers: {'col_name': col_index}
+        headers, col_index, col_name = {}, 1, True
+        while col_name:
+            col_name = worksheet.cell(1, col_index).value
+            if bool(col_name):
+                headers[col_name] = col_index
+            col_index += 1
+        
+        # Read rows
+        vals_list = []
+        for row in range(2, worksheet.max_row+1):
+            vals = {}
+            for col_name, col_index in headers.items():
+                value = worksheet.cell(row, col_index).value
+                if bool(value) or isinstance(value, bool): # filter empty cells
+                    vals[col_name] = value if isinstance(value, bool) else str(value).strip()
+            vals_list.append(vals)
+        
+        return headers, vals_list
+
+    #===== Data logics methods =====#
     @api.model
     def _prepare_speedy(self):
         logger.debug('Start to prepare import speedy')

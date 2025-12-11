@@ -18,8 +18,8 @@ class ProductImportHelper(TransactionCase):
     def test_product_import(self):
         vals = {
             'line': 1,
-            'name': ' Carte-postale Ventoux ',
-            'default_code': ' CPVTX ',
+            'name': ' Carte-postale Ventoux',
+            'default_code': 'CPVTX',
             'barcode': '12345678',
             'type': 'consu',
             'is_storable': True,

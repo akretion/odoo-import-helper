@@ -9,7 +9,6 @@ from odoo.tools import plaintext2html
 
 import re
 import copy
-import openpyxl, base64, io
 
 from stdnum.eu.vat import is_valid as vat_is_valid, check_vies
 from stdnum.iban import is_valid as iban_is_valid
@@ -23,57 +22,10 @@ logger = logging.getLogger(__name__)
 
 class ImportHelper(models.TransientModel):
     _inherit = 'import.helper'
-
-    file = fields.Binary(string = 'XML file')
-
-    #===== XLSX import methods =====#
-    def _get_sheet_names(self):
-        return ['companies', 'contacts', 'banks',]
     
-    def button_import_partner(self):
-        """ Button pressed by user, triggering the import methods """
-        # read xlsx
-        bin_data = base64.b64decode(self.file)
-        data = io.BytesIO(bin_data)
-        workbook = openpyxl.load_workbook(data)
-        sheets = {name: workbook[name] for name in self._get_sheet_names() if name in workbook}
-
-        # load sheets and commit data to database
-        speedy = self._prepare_speedy()
-        for sheet_name, sheet in sheets.items():
-            method = '_load_sheet_' + sheet_name
-            if hasattr(self, method):
-                logger.info("Loading sheet: %s", sheet_name)
-                headers, vals_list = self._sheet_to_dict(sheet)
-                getattr(self, method)(speedy, headers, vals_list)
-            else:
-                logger.warning("Sheet ignored: %s", sheet_name)
-        
-        return self._result_action(speedy)
-
-    def _sheet_to_dict(self, worksheet):
-        """ Transform `worksheet` into a `vals_list` """
-        # Get headers: {'col_name': col_index}
-        headers, col_index, col_name = {}, 1, True
-        while col_name:
-            col_name = worksheet.cell(1, col_index).value
-            if bool(col_name):
-                headers[col_name] = col_index
-            col_index += 1
-        
-        # Read rows
-        vals_list = []
-        for row in range(2, worksheet.max_row+1):
-            vals = {}
-            for col_name, col_index in headers.items():
-                value = worksheet.cell(row, col_index).value
-                if bool(value): # filter empty cells
-                    vals[col_name] = str(value).strip()
-            if row == 1015:
-                assert vals
-            vals_list.append(vals)
-        
-        return headers, vals_list
+    #===== Import methods =====#
+    def _get_sheet_names(self):
+        return super()._get_sheet_names() + ['companies', 'contacts', 'banks',]
 
     def _get_companies_address_types(self):
         """ Suffixes of col names for company's address types
@@ -161,6 +113,7 @@ class ImportHelper(models.TransientModel):
                     'parent_id': parent_id,
                     'line': 'contacts_%d' % row,
                 }
+                del vals['ref']
             self.sudo()._create_partner(vals, speedy) # sudo for multi-company
             row += 1
 

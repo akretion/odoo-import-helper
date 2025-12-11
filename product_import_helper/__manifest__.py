@@ -15,5 +15,6 @@
         "import_helper_base",
         # account_product_fiscal_classification is now optional
     ],
+    'data': ['wizards/import_helper_wizard.xml',],
     "installable": True,
 }

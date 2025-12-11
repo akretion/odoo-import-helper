@@ -44,7 +44,7 @@ In the sample code above, ``vals`` is the dictionary that will be passed to ``cr
 
 - it must contain a **'line'** key to indicate the Excel/CSV import ref in logs, which will be removed before calling ``create()``,
 - if the OCA module **account_product_fiscal_classification** is installed (optional), it can contain a **'vat_rate'** key with the VAT rate x 10 as integer (20% -> 200, 10% -> 100, 5,5% -> 55, 2,1% -> 21) that will be used to set the fiscal classification,
-- it can contain a **'supplier_id'** key with the ID of the supplier partner, along with the keys **'supplier_price'**, **'supplier_product_code'**, **'supplier_product_name'**, **'supplier_delay'**, **'supplier_currency'** (currency ISO code or ID),
+- it can contain a **'supplier_id'** key with the ID of the supplier partner or a **'supplier_code'** with the code of the supplier partner, along with the keys **'supplier_price'**, **'supplier_product_code'**, **'supplier_product_name'**, **'supplier_delay'**, **'supplier_currency'** (currency ISO code or ID),
 - it can contain an **'orderpoint_min_qty'** key the min quantity of the reordering rule, along with the keys **'orderpoint_max_qty'** and **'orderpoint_trigger'** ('manual' or 'auto'),
 - it can contain a **'categ_name'** key that will be used to match an existing product category or create a new one,
 - it can contain a **'pos_categ_name'** key that will be used to match an existing POS category or create a new one,
@@ -53,6 +53,7 @@ In the sample code above, ``vals`` is the dictionary that will be passed to ``cr
 - it can contain a **'route_codes'** key that contains a list of codes among the following codes: 'buy', 'manufacture' or 'mto' to set the routes.
 - it can contain a **'origin_country_name'** key that contain a country name or code that will be used to set the country of origin (origin_country_id)
 - it can contain a **'hs_code_code'** key that has the H.S. code (will match on the field *local_code* of hs.code)
+- it can contain a **'tags'** key that contains list of tags separated by a comma like 'Tag1,Tag2'
 
 Author
 ======

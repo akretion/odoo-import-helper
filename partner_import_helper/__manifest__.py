@@ -16,9 +16,7 @@
         'l10n_fr',
         'phone_validation',  # would be nice to avoid depending on it ?
     ],
-    'data': [
-        'wizards/import_helper_wizard.xml',
-    ],
-    "external_dependencies": {"python" : ["email-validator", "openpyxl", "openai"]},
+    'data': ['wizards/import_helper_wizard.xml',],
+    "external_dependencies": {"python" : ["email-validator",]},
     'installable': True,
 }

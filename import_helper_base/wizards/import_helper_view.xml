@@ -10,9 +10,19 @@
         <field name="arch" type="xml">
             <form>
                 <group name="main">
+                    <button type="object" name="button_download_template"
+                        invisible="not context.get('template_path')"
+                        icon="fa-download" class="mb-4 btn btn-secondary"
+                    >
+                        Import template
+                    </button>
+
+                    <field name="ai_engine" invisible="context.get('hide_ai')" />
+                    <field name="file" />
                     <field name="logs" nolabel="1" colspan="2" />
                 </group>
                 <footer>
+                    <button string="Import" type="object" name="button_import_file" class="btn btn-primary" />
                     <button string="Discard" class="btn-secondary" special="cancel" />
                 </footer>
             </form>

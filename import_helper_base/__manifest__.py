@@ -13,7 +13,7 @@
     'depends': [
         'base',
         ],
-    "external_dependencies": {"python" : ["pycountry", "openai", "unidecode"]},
+    "external_dependencies": {"python" : ["pycountry", "openai", "unidecode", "openpyxl"]},
     'data': [
         'security/ir.model.access.csv',
         'wizards/import_helper_view.xml',

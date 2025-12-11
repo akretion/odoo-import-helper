@@ -92,7 +92,7 @@ class PartnerImportHelper(TransactionCase):
 
         # test data
         self.env.company.partner_id.ref = 'Holding'
-        action = wizard.button_import_partner()
+        action = wizard.button_import_file()
         self.assertTrue(isinstance(action, dict))
 
         partner = self.env['res.partner'].search([('ref', '=', 'FRN001')])

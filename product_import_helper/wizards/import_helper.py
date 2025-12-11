@@ -10,13 +10,24 @@ from odoo.exceptions import UserError
 import logging
 logger = logging.getLogger(__name__)
 
-
 class ImportHelper(models.TransientModel):
     _inherit = "import.helper"
 
+    #===== Import methods =====#
+    def _get_sheet_names(self):
+        return super()._get_sheet_names() + ['products',]
+
+    def _load_sheet_products(self, speedy, headers, vals_list):
+        """ Browse `products` worksheet and call `_create_product` """
+        speedy = self._prepare_speedy()
+        for row, vals in enumerate(vals_list, start=2):
+            vals |= {'line': 'products_%s' % row}
+            self._create_product(vals, speedy)
+
+    #===== Data import logics =====#
     @api.model
-    def _prepare_speedy(self, aiengine='chatgpt'):
-        speedy = super()._prepare_speedy(aiengine=aiengine)
+    def _prepare_speedy(self):
+        speedy = super()._prepare_speedy()
         speedy["logs"]["product.product"] = []
         ppo = self.env['product.product']
         speedy.update({
@@ -30,9 +41,11 @@ class ImportHelper(models.TransientModel):
             'route_code2id': {},
             'intrastat': hasattr(ppo, 'hs_code_id'),
             'hs_code2id': {},
-            })
+            'tags2id': {},
+        })
+        
         # if account_product_fiscal_classification is installed
-        if self.env.get('account.product.fiscal.classification'):
+        if 'account.product.fiscal.classification' in self.env:
             speedy["vat_rate2fc_id"] = {}
             for fc in self.env['account.product.fiscal.classification'].search([]):
                 if len(fc.purchase_tax_ids) == 1 and len(fc.sale_tax_ids) == 1:
@@ -103,7 +116,7 @@ class ImportHelper(models.TransientModel):
             speedy['product_barcode2name'][product.barcode] = '%s (ID %d)' % (vals['display_name'], vals['id'])
         if product.default_code:
             speedy['product_default_code2name'][product.default_code] = '%s (ID %d)' % (vals['display_name'], vals['id'])
-        logger.info('New product created: %s ID %d from line %d', product.display_name, product.id, vals['line'])
+        logger.info('New product created: %s ID %d from line %s', product.display_name, product.id, vals['line'])
         if inventory and stock_qty:
             if product.is_storable:
                 self._set_stock_level(product, stock_qty, location_id, speedy)
@@ -153,6 +166,7 @@ class ImportHelper(models.TransientModel):
         for key, value in vals.items():
             if isinstance(value, str):
                 vals[key] = value.strip() or False
+        
         if vals.get('default_code'):
             if vals['default_code'] in speedy['product_default_code2name']:
                 speedy['logs']['product.product'].append({
@@ -163,6 +177,7 @@ class ImportHelper(models.TransientModel):
                     'reset': True,
                     })
                 return False
+
         if vals.get('barcode'):
             barcode = vals['barcode']
             if barcode in speedy['product_barcode2name']:
@@ -189,6 +204,7 @@ class ImportHelper(models.TransientModel):
                     'vals': vals,
                     'field': 'product.product,barcode',
                     })
+        
         if 'vat_rate' in vals and 'vat_rate2fc_id' in speedy:
             vat_rate = vals['vat_rate']
             if not isinstance(vat_rate, int):
@@ -210,11 +226,14 @@ class ImportHelper(models.TransientModel):
                     'field': 'product.product,barcode',
                     'reset': True,
                     })
+        
         if vals.get('categ_name'):
             if vals['categ_name'] not in speedy['product_categ2id']:
                 categ = self.env['product.category'].create(self._prepare_product_category(vals, speedy))
                 speedy['product_categ2id'][vals['categ_name']] = categ.id
+                logger.info('New category of product created: %s, ID %d', vals['categ_name'], categ.id)
             vals['categ_id'] = speedy['product_categ2id'][vals['categ_name']]
+        
         if speedy['pos'] and vals.get('pos_categ_name'):
             if vals['pos_categ_name'] not in speedy['pos_categ2id']:
                 pos_categ = self.env['pos.category'].create(self._prepare_pos_category(vals, speedy))
@@ -222,31 +241,50 @@ class ImportHelper(models.TransientModel):
             vals['pos_categ_id'] = speedy['pos_categ2id'][vals['pos_categ_name']]
 
         supplierinfo_vals = {}
-        if vals.get('supplier_id'):
-            supplierinfo_vals = {
-                'partner_id': vals['supplier_id'],
-                'price': vals.get('supplier_price'),
-                'product_code': vals.get('supplier_product_code'),
-                'product_name': vals.get('supplier_product_name'),
-                }
-            if vals.get('supplier_delay'):
-                supplierinfo_vals['delay'] = vals['supplier_delay']
-            if vals.get('supplier_currency'):
-                if isinstance(vals['supplier_currency'], int):
-                    supplierinfo_vals['currency_id'] = vals['supplier_currency']
-                elif isinstance(vals['supplier_currency'], str):
-                    currency = vals['supplier_currency'].upper().strip()
-                    if currency in speedy['currency2id']:
-                        supplierinfo_vals['currency_id'] = speedy['currency2id'][currency]
-                    else:
-                        speedy['logs']['product.product'].append({
-                            'msg': '%s is not a known currency ISO code' % currency,
-                            'value': currency,
-                            'vals': vals,
-                            'field': 'product.supplierinfo,currency_id',
-                            'reset': True,
-                            })
-            vals['seller_ids'] = [Command.create(supplierinfo_vals)]
+        if vals.get('supplier_id') or vals.get('supplier_code'):
+            # supplier_id
+            if vals.get('supplier_id'):
+                supplierinfo_vals['partner_id'] = vals['supplier_id']
+            elif vals.get('supplier_code'):
+                supplier_code = vals['supplier_code']
+                if supplier_code in speedy['supplier_code2id']:
+                    supplierinfo_vals['partner_id'] = speedy['supplier_code2id'][supplier_code]
+                else:
+                    speedy['logs']['product.product'].append({
+                        'msg': '%s is not a known partner ref' % supplier_code,
+                        'value': supplier_code,
+                        'vals': vals,
+                        'field': 'product.supplierinfo,partner_id',
+                        'reset': True,
+                    })
+
+            if supplierinfo_vals.get('partner_id'):
+                # add any fields prefixed with 'supplier_'
+                magic_fields = ['supplier_id', 'supplier_currency']
+                for k, v in vals.items():
+                    if k.startswith('supplier_') and k not in magic_fields:
+                        supplierinfo_vals[k.replace('supplier_', '')] = v
+                
+                # currency
+                if vals.get('supplier_currency'):
+                    if isinstance(vals['supplier_currency'], int):
+                        supplierinfo_vals['currency_id'] = vals['supplier_currency']
+                    elif isinstance(vals['supplier_currency'], str):
+                        currency = vals['supplier_currency'].upper().strip()
+                        if currency in speedy['currency2id']:
+                            supplierinfo_vals['currency_id'] = speedy['currency2id'][currency]
+                        else:
+                            speedy['logs']['product.product'].append({
+                                'msg': '%s is not a known currency ISO code' % currency,
+                                'value': currency,
+                                'vals': vals,
+                                'field': 'product.supplierinfo,currency_id',
+                                'reset': True,
+                                })
+                
+                # add vals to product's `seller_ids`
+                vals['seller_ids'] = [Command.create(supplierinfo_vals)]
+        
         if vals.get('orderpoint_min_qty'):
             if not location_id:
                 raise UserError(_("location_id argument is not set and no warehouse in company '%s'.") % self.env.company.display_name)
@@ -300,6 +338,7 @@ class ImportHelper(models.TransientModel):
         for key in vals.keys():
             if key != 'orderpoint_ids' and (key.startswith('supplier_') or key.startswith('orderpoint_')):
                 rvals.pop(key)
+    
         return rvals
 
     def _prepare_product_category(self, vals, speedy):
