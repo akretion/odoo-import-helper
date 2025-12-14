@@ -104,8 +104,10 @@ class ImportHelper(models.TransientModel):
             vals = {}
             for col_name, col_index in headers.items():
                 value = worksheet.cell(row, col_index).value
-                if bool(value) or isinstance(value, bool): # filter empty cells
-                    vals[col_name] = value if isinstance(value, bool) else str(value).strip()
+                if isinstance(value, str):
+                    value = value.strip()
+                if value not in (None, ''): # filter empty cells
+                    vals[col_name] = value
             vals_list.append(vals)
         
         return headers, vals_list
