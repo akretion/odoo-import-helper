@@ -13,7 +13,7 @@
         "import_helper_base",
         "phone_validation",  # would be nice to avoid depending on it ?
         "partner_import_helper",
-        # "product_import_helper",
+        "product_import_helper",
         # "account_import_helper",
     ],
     "installable": True,

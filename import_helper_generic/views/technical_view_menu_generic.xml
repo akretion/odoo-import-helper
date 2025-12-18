@@ -10,6 +10,7 @@
         </group>
                 <group name="main" col="3">
                     <button name="partner_import_generic" type="object" string="Partner import"/>
+                    <button name="product_import_generic" type="object" string="Product import"/>
                 </group>
             </form>
         </field>
