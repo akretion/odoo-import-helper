@@ -37,6 +37,7 @@ LIST_COL_POP = [
     "attributes",
     "ref_supplier",
     "ref_template",
+    "Colonnes:",
 ]
 
 
@@ -149,6 +150,7 @@ class ImportHelpergeneric(models.TransientModel):
     def check_vals_product(self, vals):
         variant_att = ()
         list_attribute_ids = {}
+        template = False
         if "attributes" in vals:
             speedy_attribute_value = self.prepare_speedy_attribute_value()
             variant_att = vals["attributes"].split("/")
@@ -169,10 +171,12 @@ class ImportHelpergeneric(models.TransientModel):
             speedy_partner_id = self.speedy_partner_id()
             if vals["ref_supplier"] in speedy_partner_id:
                 vals["supplier_id"] = speedy_partner_id[vals["ref_supplier"]]
+        if vals.get("Colonnes:") == "product.template":
+            template = True
         for i in LIST_COL_POP:
             if vals.get(i):
                 vals.pop(i)
-        return vals, variant_att, list_attribute_ids
+        return vals, variant_att, list_attribute_ids, template
 
     def product_import_generic(self):
         fileobj = NamedTemporaryFile(
@@ -187,10 +191,19 @@ class ImportHelpergeneric(models.TransientModel):
         speedy = import_obj._prepare_speedy(aiengine="NONE")
         line = 0
         colonnes = []
+        reference = ""
+        for row in reader.iter_rows(min_row=1, max_row=2, max_col=6, values_only=True):
+            if row[0] == "Infotmation":
+                if row[1] == "Champ de reference":
+                    reference = row[2]
         product_ids = self.env["product.product"].search([])
         speedy_product_list = {}
-        for p in product_ids:
-            speedy_product_list[p.default_code] = p.id
+        if reference == "default_code":
+            for p in product_ids:
+                speedy_product_list[p.default_code] = p.id
+        if reference == "barcode":
+            for p in product_ids:
+                speedy_product_list[p.barcode] = p.id
         product_template_ids = self.env["product.template"].search([])
         speedy_product_template_list = {}
         for p in product_template_ids:
@@ -205,8 +218,7 @@ class ImportHelpergeneric(models.TransientModel):
                     else:
                         colonnes.append("empty")
                 continue
-
-            if row[1]:
+            if row[0]:
                 line += 1
                 vals["line"] = line
                 for c in range(len(row)):
@@ -219,27 +231,29 @@ class ImportHelpergeneric(models.TransientModel):
                     vals["product_tmpl_id"] = speedy_product_template_list[
                         vals["ref_template"]
                     ]
-                vals, variant_att, list_attribue_ids = self.check_vals_product(vals)
-                if (
-                    not vals.get("product_tmpl_id")
-                    and vals["default_code"] in speedy_product_template_list
-                ):
-                    location_id = vals.get("location_id") or speedy.get(
-                        "default_location_id"
-                    )
-                    vals = import_obj._prepare_product_vals(vals, location_id, speedy)
-                    res = (
-                        self.env["product.template"]
-                        .browse(speedy_product_list[vals["default_code"]])
-                        .write(vals)
-                    )
-                    if res:
-                        logger.info(
-                            f"{res.display_name},id {res.id} has been update with line {line}"
-                        )
-                    else:
-                        logger.warning(f"line {line} have done nothing")
-                elif vals["default_code"] in speedy_product_list:
+                vals, variant_att, list_attribue_ids, template = (
+                    self.check_vals_product(vals)
+                )
+                # if (
+                #     not vals.get("product_tmpl_id")
+                #     and vals["default_code"] in speedy_product_template_list
+                # ):
+                #     location_id = vals.get("location_id") or speedy.get(
+                #         "default_location_id"
+                #     )
+                #     vals = import_obj._prepare_product_vals(vals, location_id, speedy)
+                #     res = (
+                #         self.env["product.template"]
+                #         .browse(speedy_product_list[vals["default_code"]])
+                #         .write(vals)
+                #     )
+                #     if res:
+                #         logger.info(
+                #             f"{res.display_name},id {res.id} has been update with line {line}"
+                #         )
+                #     else:
+                #         logger.warning(f"line {line} have done nothing")
+                if not template and vals.get(reference) in speedy_product_list:
                     location_id = vals.get("location_id") or speedy.get(
                         "default_location_id"
                     )
@@ -255,7 +269,11 @@ class ImportHelpergeneric(models.TransientModel):
                         )
                     else:
                         logger.warning(f"line {line} have done nothing")
-                elif vals.get("product_tmpl_id"):
+                elif (
+                    not template
+                    and vals.get(reference) not in speedy_product_list
+                    and vals.get("product_tmpl_id")
+                ):
                     location_id = vals.get("location_id") or speedy.get(
                         "default_location_id"
                     )
@@ -274,7 +292,9 @@ class ImportHelpergeneric(models.TransientModel):
                                         vals["standard_price"]
                                     )
                                     p.write(vals)
-                else:
+                elif not template:
+                    res = import_obj._create_product(vals, speedy)
+                elif template:
                     location_id = vals.get("location_id") or speedy.get(
                         "default_location_id"
                     )
@@ -293,6 +313,8 @@ class ImportHelpergeneric(models.TransientModel):
                         logger.info(f"{p_tmpl.id} has been create")
                     else:
                         logger.warning("nothing")
+                else:
+                    logger.warning(f"NO PRODUCT IMPORTED line {line} Name {row[1]}")
             else:
                 break
         action = import_obj._result_action(speedy)
