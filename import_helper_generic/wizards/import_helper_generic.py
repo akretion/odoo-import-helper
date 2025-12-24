@@ -292,7 +292,7 @@ class ImportHelpergeneric(models.TransientModel):
                                         vals["standard_price"]
                                     )
                                     p.write(vals)
-                elif not template:
+                elif not template or template and not variant_att:
                     res = import_obj._create_product(vals, speedy)
                 elif template:
                     location_id = vals.get("location_id") or speedy.get(
