@@ -405,8 +405,8 @@ class ImportHelper(models.TransientModel):
                 else:
                     tag_id = self.env["product.tag"].create({"name": tag})
                     list_tag_id.append(tag_id.id)
-                    speedy_tags[tag] = tag.id
-            vals["product_tag_ids"] = Command.set(list_tag_id)
+                    speedy_tags[tag] = tag_id.id
+            vals["product_tag_ids"] = [Command.set(list_tag_id)]
         if vals.get("tags_variant"):
             list_tag_id = []
             for tag in vals["tags_variant"].split("/"):
@@ -415,8 +415,8 @@ class ImportHelper(models.TransientModel):
                 else:
                     tag_id = self.env["product.tag"].create({"name": tag})
                     list_tag_id.append(tag_id.id)
-                    speedy_tags[tag] = tag.id
-            vals["additional_product_tag_ids"] = Command.set(list_tag_id)
+                    speedy_tags[tag] = tag_id.id
+            vals["additional_product_tag_ids"] = [Command.set(list_tag_id)]
 
         # Remove all keys that start with supplier_
         # vals will keep the original keys
