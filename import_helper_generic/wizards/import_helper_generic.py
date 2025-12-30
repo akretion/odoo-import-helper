@@ -193,21 +193,25 @@ class ImportHelpergeneric(models.TransientModel):
         colonnes = []
         reference = ""
         for row in reader.iter_rows(min_row=1, max_row=2, max_col=6, values_only=True):
-            if row[0] == "Infotmation":
+            if row[0] == "Information":
                 if row[1] == "Champ de reference":
                     reference = row[2]
-        product_ids = self.env["product.product"].search([])
+        product_ids = self.env["product.product"].search_read(
+            [], ["default_code", "barcode"]
+        )
         speedy_product_list = {}
         if reference == "default_code":
             for p in product_ids:
-                speedy_product_list[p.default_code] = p.id
+                speedy_product_list[p["default_code"]] = p["id"]
         if reference == "barcode":
             for p in product_ids:
-                speedy_product_list[p.barcode] = p.id
-        product_template_ids = self.env["product.template"].search([])
+                speedy_product_list[p["barcode"]] = p["id"]
+        product_template_ids = self.env["product.template"].search_read(
+            [], ["default_code"]
+        )
         speedy_product_template_list = {}
         for p in product_template_ids:
-            speedy_product_template_list[p.default_code] = p.id
+            speedy_product_template_list[p["default_code"]] = p["id"]
         list_product_create = {}
         for row in reader.iter_rows(min_row=4, values_only=True):
             vals = {}
@@ -260,7 +264,7 @@ class ImportHelpergeneric(models.TransientModel):
                     vals = import_obj._prepare_product_vals(vals, location_id, speedy)
                     res = (
                         self.env["product.product"]
-                        .browse(speedy_product_list[vals["default_code"]])
+                        .browse(speedy_product_list[vals[reference]])
                         .write(vals)
                     )
                     if res:
@@ -269,6 +273,7 @@ class ImportHelpergeneric(models.TransientModel):
                         )
                     else:
                         logger.warning(f"line {line} have done nothing")
+                    continue
                 elif (
                     not template
                     and vals.get(reference) not in speedy_product_list
@@ -292,8 +297,22 @@ class ImportHelpergeneric(models.TransientModel):
                                         vals["standard_price"]
                                     )
                                     p.write(vals)
+                     continue
+                elif template and vals.get("default_code") in speedy_product_template_list:
+                    record = self.env["product.template"].browse(speedy_product_template_list[vals["default_code"]])
+                    if record and not vals["location_id"]:
+                        vals["location_id"] = record.location_id
+                    vals = import_obj._prepare_product_vals(vals, vals["location_id"], speedy)
+                    res = record.write(vals)
+                    if res:
+                        continue
+                    else:
+                        logger.warning("ERREUR lors de la mise a jour du product")
+                        continue
+
                 elif not template or template and not variant_att:
                     res = import_obj._create_product(vals, speedy)
+                    continue
                 elif template:
                     location_id = vals.get("location_id") or speedy.get(
                         "default_location_id"
@@ -313,6 +332,7 @@ class ImportHelpergeneric(models.TransientModel):
                         logger.info(f"{p_tmpl.id} has been create")
                     else:
                         logger.warning("nothing")
+                        continue
                 else:
                     logger.warning(f"NO PRODUCT IMPORTED line {line} Name {row[1]}")
             else:
