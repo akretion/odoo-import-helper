@@ -263,7 +263,7 @@ class ImportHelpergeneric(models.TransientModel):
                     )
                     vals = import_obj._prepare_product_vals(vals, location_id, speedy)
                     if not vals:
-                        logger.warning("Product on line %s skipped", vals.get("line"))
+                        logger.warning("Product on line %s skipped", line)
                         continue
                     res = (
                         self.env["product.product"]
@@ -287,7 +287,7 @@ class ImportHelpergeneric(models.TransientModel):
                     )
                     vals = import_obj._prepare_product_vals(vals, location_id, speedy)
                     if not vals:
-                        logger.warning("Product on line %s skipped", vals.get("line"))
+                        logger.warning("Product on line %s skipped", line)
                         continue
                     if vals["product_tmpl_id"] in list_product_create:
                         template = list_product_create[vals["product_tmpl_id"]]
@@ -317,7 +317,7 @@ class ImportHelpergeneric(models.TransientModel):
                         vals, vals["location_id"], speedy
                     )
                     if not vals:
-                        logger.warning("Product on line %s skipped", vals.get("line"))
+                        logger.warning("Product on line %s skipped", line)
                         continue
 
                     res = record.write(vals)
@@ -337,7 +337,7 @@ class ImportHelpergeneric(models.TransientModel):
                     )
                     vals = import_obj._prepare_product_vals(vals, location_id, speedy)
                     if not vals:
-                        logger.warning("Product on line %s skipped", vals.get("line"))
+                        logger.warning("Product on line %s skipped", line)
                         continue
                     p_tmpl = self.env["product.template"].create(vals)
                     speedy_product_template_list[p_tmpl.default_code] = p_tmpl.id
