@@ -262,6 +262,9 @@ class ImportHelpergeneric(models.TransientModel):
                         "default_location_id"
                     )
                     vals = import_obj._prepare_product_vals(vals, location_id, speedy)
+                    if not vals:
+                        logger.warning("Product on line %s skipped", vals.get("line"))
+                        continue
                     res = (
                         self.env["product.product"]
                         .browse(speedy_product_list[vals[reference]])
@@ -283,6 +286,9 @@ class ImportHelpergeneric(models.TransientModel):
                         "default_location_id"
                     )
                     vals = import_obj._prepare_product_vals(vals, location_id, speedy)
+                    if not vals:
+                        logger.warning("Product on line %s skipped", vals.get("line"))
+                        continue
                     if vals["product_tmpl_id"] in list_product_create:
                         template = list_product_create[vals["product_tmpl_id"]]
                     else:
@@ -310,6 +316,10 @@ class ImportHelpergeneric(models.TransientModel):
                     vals = import_obj._prepare_product_vals(
                         vals, vals["location_id"], speedy
                     )
+                    if not vals:
+                        logger.warning("Product on line %s skipped", vals.get("line"))
+                        continue
+
                     res = record.write(vals)
                     if res:
                         logger.info(f"Update {res.name} {res.id} Ok")
@@ -326,6 +336,9 @@ class ImportHelpergeneric(models.TransientModel):
                         "default_location_id"
                     )
                     vals = import_obj._prepare_product_vals(vals, location_id, speedy)
+                    if not vals:
+                        logger.warning("Product on line %s skipped", vals.get("line"))
+                        continue
                     p_tmpl = self.env["product.template"].create(vals)
                     speedy_product_template_list[p_tmpl.default_code] = p_tmpl.id
                     list_product_create[p_tmpl.id] = p_tmpl
