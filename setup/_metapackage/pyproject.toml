@@ -1,14 +1,11 @@
 [project]
 name = "odoo-addons-akretion-odoo-import-helper"
-version = "18.0.20250130.0"
+version = "19.0.20251230.0"
 dependencies = [
-    "odoo-addon-account_import_helper==18.0.*",
-    "odoo-addon-import_helper_base==18.0.*",
-    "odoo-addon-partner_import_helper==18.0.*",
-    "odoo-addon-product_import_helper==18.0.*",
+    "odoo-addon-account_import_helper==19.0.*",
 ]
 classifiers=[
     "Programming Language :: Python",
     "Framework :: Odoo",
-    "Framework :: Odoo :: 18.0",
+    "Framework :: Odoo :: 19.0",
 ]
