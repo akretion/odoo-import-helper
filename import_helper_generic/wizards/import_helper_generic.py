@@ -305,7 +305,7 @@ class ImportHelpergeneric(models.TransientModel):
                     record = self.env["product.template"].browse(
                         speedy_product_template_list[vals["default_code"]]
                     )
-                    if record and not vals["location_id"]:
+                    if record and not vals.get("location_id"):
                         vals["location_id"] = record.location_id
                     vals = import_obj._prepare_product_vals(
                         vals, vals["location_id"], speedy
