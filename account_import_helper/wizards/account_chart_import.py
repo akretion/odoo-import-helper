@@ -27,7 +27,7 @@ class AccountChartImport(models.TransientModel):
     source_module = fields.Selection([
         ('l10n_fr_account', 'l10n_fr_account'),
         ('l10n_fr_account_oca', 'l10n_fr_account_oca'),
-        ], default='l10n_fr_account_oca', required=True)
+        ], default='l10n_fr_account', required=True)
     input_file = fields.Binary(required=True, string="XLSX file")
     input_filename = fields.Char()
     input_start_line = fields.Integer(string="Start Line", default=2, required=True)

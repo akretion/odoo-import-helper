@@ -15,5 +15,5 @@
         "import_helper_base",
         # account_product_fiscal_classification is now optional
     ],
-    "installable": True,
+    "installable": False,
 }
