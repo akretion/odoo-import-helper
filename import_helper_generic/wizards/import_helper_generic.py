@@ -210,8 +210,13 @@ class ImportHelpergeneric(models.TransientModel):
         for p in product_template_ids:
             speedy_product_template_list[p["default_code"]] = p["id"]
         list_product_create = {}
+        count = 0
         for row in reader.iter_rows(min_row=4, values_only=True):
             vals = {}
+            if count >= 500:
+                self.env.cr.commit()
+                count = 0
+                logger.info("commit 500 product")
             if row[0] == "Colonnes:":
                 for c in range(len(row)):
                     if row[c]:
@@ -275,7 +280,8 @@ class ImportHelpergeneric(models.TransientModel):
                         if not vals:
                             logger.warning("Product on line %s skipped", line)
                             continue
-                        vals["standard_price"] = float(vals["standard_price"])
+                        if vals.get("standard_price"):
+                            vals["standard_price"] = float(vals["standard_price"])
                         res = record.write(vals)
                         if res:
                             logger.info(
@@ -305,7 +311,8 @@ class ImportHelpergeneric(models.TransientModel):
                         if not vals:
                             logger.warning("Product on line %s skipped", line)
                             continue
-                        vals["standard_price"] = float(vals["standard_price"])
+                        if vals.get("standard_price"):
+                            vals["standard_price"] = float(vals["standard_price"])
                         res = record.write(vals)
                         if res:
                             logger.info(
@@ -336,9 +343,10 @@ class ImportHelpergeneric(models.TransientModel):
                         if p.product_template_attribute_value_ids:
                             for v in p.product_template_attribute_value_ids:
                                 if v.product_attribute_value_id.fullname in variant_att:
-                                    vals["standard_price"] = float(
-                                        vals["standard_price"]
-                                    )
+                                    if vals.get("standard_price"):
+                                        vals["standard_price"] = float(
+                                            vals["standard_price"]
+                                        )
                                     p.write(vals)
                     continue
                 elif (
