@@ -80,7 +80,7 @@ class ImportHelper(models.TransientModel):
                         address_vals |= {col_name.replace(address + '_', ''): str(value).strip()}
                         vals.pop(col_name)
                 if address_vals:
-                    addresses_vals_list += [address_vals_default | {'type': address} | address_vals]
+                    addresses_vals_list.append(address_vals_default | {'type': address} | address_vals)
             
             vals = company_vals_default | {
                 k: v for k, v in vals.items()
@@ -378,13 +378,17 @@ class ImportHelper(models.TransientModel):
                 'value': 'Individual',
                 'vals': vals,
                 'field': 'res.partner,is_company',
-                })
+            })
         # company_id
         if vals.get('company_ref'):
             if vals['company_ref'] not in speedy['company']:
                 raise UserError(_("Company %s does not exist in Odoo. Contact not imported.", vals['company_ref']))
             else:
-                vals['company_id'] = speedy['company'][vals['company_ref']]
+                # set company_id on the contact and its children
+                company_id = speedy['company'][vals['company_ref']]
+                vals['company_id'] = company_id
+                for child in vals.get('child_ids', {}):
+                    child['company_id'] = company_id
         # VAT
         vat = False
         if vals.get('vat') and (not country_id or country_id in speedy['eu_country_ids']):
