@@ -204,11 +204,11 @@ class ImportHelpergeneric(models.TransientModel):
             for p in product_ids:
                 speedy_product_list[p["barcode"]] = p["id"]
         product_template_ids = self.env["product.template"].search_read(
-            [], ["default_code"]
+            [], ["default_code_import"]
         )
         speedy_product_template_list = {}
         for p in product_template_ids:
-            speedy_product_template_list[p["default_code"]] = p["id"]
+            speedy_product_template_list[p["default_code_import"]] = p["id"]
         list_product_create = {}
         count = 0
         for row in reader.iter_rows(min_row=4, values_only=True):
@@ -259,160 +259,218 @@ class ImportHelpergeneric(models.TransientModel):
                 #         )
                 #     else:
                 #         logger.warning(f"line {line} have done nothing")
-                if not template and vals.get(reference) in speedy_product_list:
-                    location_id = vals.get("location_id") or speedy.get(
-                        "default_location_id"
-                    )
-                    ref_product = vals.pop(reference)
-                    record = self.env["product.product"].browse(
-                        speedy_product_list[ref_product]
-                    )
-                    if record:
-                        if record.location_id and record.location_id != location_id:
-                            location_id = record.location_id
-                        if vals.get("default_code") == record.default_code:
-                            vals.pop("default_code")
-                        if vals.get("barcode") == record.barcode:
-                            vals.pop("barcode")
-                        vals = import_obj._prepare_product_vals(
-                            vals, location_id, speedy
+                if not template:
+                    if vals.get(reference) in speedy_product_list:
+                        location_id = vals.get("location_id") or speedy.get(
+                            "default_location_id"
                         )
-                        if not vals:
-                            logger.warning("Product on line %s skipped", line)
-                            continue
-                        if vals.get("standard_price"):
-                            vals["standard_price"] = float(vals["standard_price"])
-                        res = record.write(vals)
-                        if res:
-                            logger.info(
-                                f"{record.display_name}, id {record.id} has been update with line {line}"
+                        ref_product = vals.pop(reference)
+                        record = self.env["product.product"].browse(
+                            speedy_product_list[ref_product]
+                        )
+                        if record:
+                            if record.location_id and record.location_id != location_id:
+                                location_id = record.location_id
+                            if vals.get("default_code") == record.default_code:
+                                vals.pop("default_code")
+                            if vals.get("barcode") == record.barcode:
+                                vals.pop("barcode")
+                            vals = import_obj._prepare_product_vals(
+                                vals, location_id, speedy
                             )
-                        else:
-                            logger.warning(f"line {line} have done nothing")
-                        continue
-                elif template and vals.get(reference) in speedy_product_list:
-                    location_id = vals.get("location_id") or speedy.get(
-                        "default_location_id"
-                    )
-                    ref_product = vals.pop(reference)
-                    record = self.env["product.product"].browse(
-                        speedy_product_list[ref_product]
-                    )
-                    if record:
-                        if record.location_id and record.location_id != location_id:
-                            location_id = record.location_id
-                        if vals.get("default_code") == record.default_code:
-                            vals.pop("default_code")
-                        if vals.get("barcode") == record.barcode:
-                            vals.pop("barcode")
-                        vals = import_obj._prepare_product_vals(
-                            vals, location_id, speedy
-                        )
-                        if not vals:
-                            logger.warning("Product on line %s skipped", line)
-                            continue
-                        if vals.get("standard_price"):
-                            vals["standard_price"] = float(vals["standard_price"])
-                        res = record.write(vals)
-                        if res:
-                            logger.info(
-                                f"{record.display_name}, id {record.id} has been update with line {line}"
-                            )
-                        else:
-                            logger.warning(f"line {line} have done nothing")
-                        continue
-                elif (
-                    not template
-                    and vals.get(reference) not in speedy_product_list
-                    and vals.get("product_tmpl_id")
-                ):
-                    location_id = vals.get("location_id") or speedy.get(
-                        "default_location_id"
-                    )
-                    vals = import_obj._prepare_product_vals(vals, location_id, speedy)
-                    if not vals:
-                        logger.warning("Product on line %s skipped", line)
-                        continue
-                    if vals["product_tmpl_id"] in list_product_create:
-                        template = list_product_create[vals["product_tmpl_id"]]
-                    else:
-                        template = self.env["product.template"].browse(
-                            vals["product_tmpl_id"]
-                        )
-                    for p in template.product_variant_ids:
-                        if p.product_template_attribute_value_ids:
-                            for v in p.product_template_attribute_value_ids:
-                                if v.product_attribute_value_id.fullname in variant_att:
-                                    if vals.get("standard_price"):
-                                        vals["standard_price"] = float(
-                                            vals["standard_price"]
-                                        )
-                                    p.write(vals)
-                    continue
-                elif (
-                    template
-                    and vals.get("default_code") in speedy_product_template_list
-                ):
-                    location_id = vals.get("location_id") or speedy.get(
-                        "default_location_id"
-                    )
-                    record = self.env["product.template"].browse(
-                        speedy_product_template_list[vals["default_code"]]
-                    )
-                    ref_product = vals.pop("default_code")
-                    if record:
-                        if record.location_id and record.location_id != location_id:
-                            location_id = record.location_id
-                        if vals.get("barcode") == record.barcode:
-                            vals.pop("barcode")
-                        vals = import_obj._prepare_product_vals(
-                            vals, location_id, speedy
-                        )
-                        if not vals:
-                            logger.warning("Product on line %s skipped", line)
-                            continue
-
-                        res = record.write(vals)
-                        if res:
-                            logger.info(f"Update {record.name} {record.id} Ok")
-                            continue
-                        else:
-                            logger.warning(
-                                f"ERREUR lors de la mise a jour du product line {line}"
-                            )
-                            continue
-                    else:
-                        logger.warning(f"No product found for {line}")
-
-                elif (not template or template) and not variant_att:
-                    res = import_obj._create_product(vals, speedy)
-                    continue
-                elif template:
-                    location_id = vals.get("location_id") or speedy.get(
-                        "default_location_id"
-                    )
-                    vals = import_obj._prepare_product_vals(vals, location_id, speedy)
-                    if not vals:
-                        logger.warning("Product on line %s skipped", line)
-                        continue
-                    p_tmpl = self.env["product.template"].create(vals)
-                    speedy_product_template_list[p_tmpl.default_code] = p_tmpl.id
-                    list_product_create[p_tmpl.id] = p_tmpl
-                    if p_tmpl:
-                        for att in list_attribue_ids:
-                            b = list_attribue_ids[att]
-                            p_tmpl.attribute_line_ids = [
-                                Command.create(
-                                    {"attribute_id": att, "value_ids": [Command.set(b)]}
+                            if not vals:
+                                logger.warning("Product on line %s skipped", line)
+                                continue
+                            if vals.get("standard_price"):
+                                vals["standard_price"] = float(vals["standard_price"])
+                            res = record.write(vals)
+                            if res:
+                                logger.info(
+                                    f"{record.display_name}, id {record.id} has been update with line {line}"
                                 )
-                            ]
-                        logger.info(f"{p_tmpl.id} has been create")
-                    else:
-                        logger.warning("nothing")
+                            else:
+                                logger.warning(f"line {line} have done nothing")
+                            continue
+                    elif vals.get("product_tmpl_id"):
+                        location_id = vals.get("location_id") or speedy.get(
+                            "default_location_id"
+                        )
+                        vals = import_obj._prepare_product_vals(
+                            vals, location_id, speedy
+                        )
+                        if not vals:
+                            logger.warning("Product on line %s skipped", line)
+                            continue
+                        if vals["product_tmpl_id"] in list_product_create:
+                            template = list_product_create[vals["product_tmpl_id"]]
+                        else:
+                            template = self.env["product.template"].browse(
+                                vals["product_tmpl_id"]
+                            )
+                        for p in template.product_variant_ids:
+                            if p.product_template_attribute_value_ids:
+                                for v in p.product_template_attribute_value_ids:
+                                    if (
+                                        v.product_attribute_value_id.fullname
+                                        in variant_att
+                                    ):
+                                        if vals.get("standard_price"):
+                                            vals["standard_price"] = float(
+                                                vals["standard_price"]
+                                            )
+                                        p.write(vals)
                         continue
+                    else:
+                        res = import_obj._create_product(vals, speedy)
+                        continue
+                elif template:
+                    if vals.get(reference) in speedy_product_list:
+                        location_id = vals.get("location_id") or speedy.get(
+                            "default_location_id"
+                        )
+                        ref_product = vals.pop(reference)
+                        record = self.env["product.product"].browse(
+                            speedy_product_list[ref_product]
+                        )
+                        if record:
+                            if record.location_id and record.location_id != location_id:
+                                location_id = record.location_id
+                            if vals.get("default_code") == record.default_code:
+                                vals.pop("default_code")
+                            if vals.get("barcode") == record.barcode:
+                                vals.pop("barcode")
+                            vals = import_obj._prepare_product_vals(
+                                vals, location_id, speedy
+                            )
+                            if not vals:
+                                logger.warning("Product on line %s skipped", line)
+                                continue
+                            if vals.get("standard_price"):
+                                vals["standard_price"] = float(vals["standard_price"])
+                            res = record.write(vals)
+                            if res:
+                                logger.info(
+                                    f"{record.display_name}, id {record.id} has been update with line {line}"
+                                )
+                            else:
+                                logger.warning(f"line {line} have done nothing")
+                            continue
+                    elif vals.get("default_code") in speedy_product_template_list:
+                        location_id = vals.get("location_id") or speedy.get(
+                            "default_location_id"
+                        )
+                        record = self.env["product.template"].browse(
+                            speedy_product_template_list[vals["default_code"]]
+                        )
+                        ref_product = vals.pop("default_code")
+                        if record:
+                            if record.location_id and record.location_id != location_id:
+                                location_id = record.location_id
+                            if vals.get("barcode") == record.barcode:
+                                vals.pop("barcode")
+                            vals = import_obj._prepare_product_vals(
+                                vals, location_id, speedy
+                            )
+                            if not vals:
+                                logger.warning("Product on line %s skipped", line)
+                                continue
+
+                            res = record.write(vals)
+                            if res:
+                                if variant_att:
+                                    speedy_line_attr = {}
+                                    for line_id in record.attribute_line_ids:
+                                        speedy_line_attr[line_id.attribute_id.id] = {
+                                            "id": line_id.id,
+                                            "value_ids": line_id.value_ids.ids,
+                                        }
+
+                                    for att in list_attribue_ids:
+                                        b = list_attribue_ids[att]
+                                        if (
+                                            speedy_line_attr.get(att)
+                                            and b != speedy_line_attr[att]["value_ids"]
+                                        ):
+                                            record.attribute_line_ids = [
+                                                Command.update(
+                                                    speedy_line_attr[att]["id"],
+                                                    {
+                                                        "value_ids": [
+                                                            Command.set(
+                                                                speedy_line_attr[att][
+                                                                    "value_ids"
+                                                                ]
+                                                            )
+                                                        ]
+                                                    },
+                                                )
+                                            ]
+                                        elif (
+                                            speedy_line_attr.get(att)
+                                            and b == speedy_line_attr[att]["value_ids"]
+                                        ):
+                                            continue
+                                        else:
+                                            record.attribute_line_ids = [
+                                                Command.create(
+                                                    {
+                                                        "attribute_id": att,
+                                                        "value_ids": [Command.set(b)],
+                                                    }
+                                                )
+                                            ]
+                                    record.default_code = ref_product
+                                logger.info(f"Update {record.name} {record.id} Ok")
+                                continue
+                            else:
+                                logger.warning(
+                                    f"ERREUR lors de la mise a jour du product line {line}"
+                                )
+                                continue
+                        else:
+                            logger.warning(f"No product found for {line}")
+                    else:
+                        location_id = vals.get("location_id") or speedy.get(
+                            "default_location_id"
+                        )
+                        vals = import_obj._prepare_product_vals(
+                            vals, location_id, speedy
+                        )
+                        if not vals:
+                            logger.warning("Product on line %s skipped", line)
+                            continue
+                        p_tmpl = self.env["product.template"].create(vals)
+                        speedy_product_template_list[p_tmpl.default_code] = p_tmpl.id
+                        list_product_create[p_tmpl.id] = p_tmpl
+                        if p_tmpl and variant_att:
+                            for att in list_attribue_ids:
+                                b = list_attribue_ids[att]
+                                p_tmpl.attribute_line_ids = [
+                                    Command.create(
+                                        {
+                                            "attribute_id": att,
+                                            "value_ids": [Command.set(b)],
+                                        }
+                                    )
+                                ]
+                            p_tmpl.default_code = vals["default_code"]
+                            logger.info(
+                                f"{p_tmpl.id} has been create with {len(list_attribue_ids)} variant"
+                            )
+                        else:
+                            logger.warning(f"{p_tmpl.id} has been create")
+                            continue
+                # elif (not template or template) and not variant_att:
+                #     res = import_obj._create_product(vals, speedy)
+                #     continue
                 else:
                     logger.warning(f"NO PRODUCT IMPORTED line {line} Name {row[1]}")
             else:
                 break
+        for t in speedy_product_template_list:
+            record = self.env["product.template"].browse(
+                speedy_product_template_list[t]
+            )
+            record.default_code = t
         action = import_obj._result_action(speedy)
         return action

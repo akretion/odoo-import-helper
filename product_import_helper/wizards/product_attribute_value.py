@@ -13,4 +13,4 @@ class ProductAttributeValue(models.Model):
     @api.depends("attribute_id.name", "name")
     def _compute_fullname(self):
         for record in self:
-            record.fullname = f"{record.attribute_id.name} :{record.name}"
+            record.fullname = f"{record.attribute_id.name}: {record.name}"
