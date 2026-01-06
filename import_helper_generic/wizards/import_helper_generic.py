@@ -318,6 +318,13 @@ class ImportHelpergeneric(models.TransientModel):
                                             vals["standard_price"] = float(
                                                 vals["standard_price"]
                                             )
+                                        if vals.get("list_price") and hasattr(
+                                            p, "fix_price"
+                                        ):
+                                            vals["fix_price"] = vals["list_price"]
+                                            vals.pop("list_price")
+                                        elif vals.get("list_price"):
+                                            vals.pop("list_price")
                                         p.write(vals)
                         continue
                     else:
