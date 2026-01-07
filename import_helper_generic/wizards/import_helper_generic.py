@@ -226,6 +226,7 @@ class ImportHelpergeneric(models.TransientModel):
                 continue
             if row[0]:
                 line += 1
+                count += 1
                 vals["line"] = line
                 for c in range(len(row)):
                     if row[c] and colonnes[c] != "empty":
