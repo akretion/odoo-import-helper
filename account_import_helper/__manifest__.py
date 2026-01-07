@@ -14,7 +14,8 @@
     "external_dependencies": {"python": ["openpyxl"]},
     "data": [
         "security/ir.model.access.csv",
-        "wizard/account_chart_generate_view.xml",
+        "wizards/account_chart_import_view.xml",
+        "wizards/account_chart_import_postprocess_view.xml",
     ],
     "installable": True,
 }
