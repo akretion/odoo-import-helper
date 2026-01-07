@@ -213,10 +213,10 @@ class ImportHelpergeneric(models.TransientModel):
         count = 0
         for row in reader.iter_rows(min_row=4, values_only=True):
             vals = {}
-            if count >= 500:
+            if count >= 200:
                 self.env.cr.commit()
                 count = 0
-                logger.info("commit 500 product")
+                logger.info("commit 200 product")
             if row[0] == "Colonnes:":
                 for c in range(len(row)):
                     if row[c]:
