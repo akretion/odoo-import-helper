@@ -234,7 +234,7 @@ class ImportHelpergeneric(models.TransientModel):
                     else:
                         colonnes.append("empty")
                 continue
-            if row[0]:
+            if row:
                 line += 1
                 count += 1
                 vals["line"] = line
@@ -428,7 +428,11 @@ class ImportHelpergeneric(models.TransientModel):
                                 "reset": True,
                             }
                         )
-                    elif vals.get("default_code") in speedy_product_template_list:
+                        continue
+                    elif (
+                        vals.get("default_code") in speedy_product_template_list
+                        and self.update_on
+                    ):
                         location_id = vals.get("location_id") or speedy.get(
                             "default_location_id"
                         )
@@ -502,6 +506,19 @@ class ImportHelpergeneric(models.TransientModel):
                                 continue
                         else:
                             logger.warning(f"No product found for {line}")
+                    elif (
+                        vals.get("default_code") in speedy_product_template_list
+                        and not self.update_on
+                    ):
+                        speedy["logs"]["product.product"].append(
+                            {
+                                "msg": f"Product_Template with {vals['default_code']} already exist for line {line}",
+                                "value": vals["default_code"],
+                                "vals": vals,
+                                "field": "product.product,default_code",
+                                "reset": True,
+                            }
+                        )
                     else:
                         location_id = vals.get("location_id") or speedy.get(
                             "default_location_id"
