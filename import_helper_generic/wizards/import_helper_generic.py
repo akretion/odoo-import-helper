@@ -319,30 +319,31 @@ class ImportHelpergeneric(models.TransientModel):
                             )
                         res_p = False
                         for p in template.product_variant_ids:
+                            fullname_att = []
                             if p.product_template_attribute_value_ids:
-                                if not p.barcode:
-                                    for v in p.product_template_attribute_value_ids:
-                                        if (
-                                            v.product_attribute_value_id.fullname
-                                            in variant_att
-                                        ):
-                                            if vals.get("standard_price"):
-                                                vals["standard_price"] = float(
-                                                    vals["standard_price"]
-                                                )
-                                            if vals.get("list_price") and hasattr(
-                                                p, "fix_price"
-                                            ):
-                                                vals["fix_price"] = vals["list_price"]
-                                                vals.pop("list_price")
-                                            elif vals.get("list_price"):
-                                                vals.pop("list_price")
-                                            res_p = p.write(vals)
-                                            logger.info(
-                                                f"product variant {p.id} has been update {v}"
-                                            )
-                                            break
-                                else:
+                                for v in p.product_template_attribute_value_ids:
+                                    fullname_att.append(
+                                        v.product_attribute_value_id.fullname
+                                    )
+
+                                if fullname_att == variant_att and not p.barcode:
+                                    if vals.get("standard_price"):
+                                        vals["standard_price"] = float(
+                                            vals["standard_price"]
+                                        )
+                                    if vals.get("list_price") and hasattr(
+                                        p, "fix_price"
+                                    ):
+                                        vals["fix_price"] = vals["list_price"]
+                                        vals.pop("list_price")
+                                    elif vals.get("list_price"):
+                                        vals.pop("list_price")
+                                    res_p = p.write(vals)
+                                    logger.info(
+                                        f"product variant {p.id} has been update {fullname_att}"
+                                    )
+                                    break
+                                elif p.barcode and fullname_att == variant_att:
                                     speedy["logs"]["product.product"].append(
                                         {
                                             "msg": f"{p.id} product with {variant_att} already exite",
@@ -352,11 +353,11 @@ class ImportHelpergeneric(models.TransientModel):
                                             "reset": True,
                                         }
                                     )
-
+                                    break
                         if not res_p:
                             speedy["logs"]["product.product"].append(
                                 {
-                                    "msg": f"Not product with {variant_att}",
+                                    "msg": f"Not product with {variant_att} for line {line}",
                                     "value": variant_att,
                                     "vals": vals,
                                     "field": "product.product,attribute_line_ids",
