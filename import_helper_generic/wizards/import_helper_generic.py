@@ -46,6 +46,7 @@ class ImportHelpergeneric(models.TransientModel):
     _description = "Import helper generic for importing information with template"
 
     file_import = fields.Binary(string="File to import")
+    update_on = fields.Boolean(string="Import or update")
 
     def speedy_partner_categori_id(self):
         categ_id = {}
@@ -270,7 +271,7 @@ class ImportHelpergeneric(models.TransientModel):
                 #     else:
                 #         logger.warning(f"line {line} have done nothing")
                 if not template:
-                    if vals.get(reference) in speedy_product_list:
+                    if vals.get(reference) in speedy_product_list and self.update_on:
                         location_id = vals.get("location_id") or speedy.get(
                             "default_location_id"
                         )
@@ -301,6 +302,19 @@ class ImportHelpergeneric(models.TransientModel):
                             else:
                                 logger.warning(f"line {line} have done nothing")
                             continue
+                    elif (
+                        vals.get(reference) in speedy_product_list
+                        and not self.update_on
+                    ):
+                        speedy["logs"]["product.product"].append(
+                            {
+                                "msg": f"Product with {vals[reference]} already exist for line {line}",
+                                "value": vals[reference],
+                                "vals": vals,
+                                "field": f"product.product,{reference}",
+                                "reset": True,
+                            }
+                        )
                     elif vals.get("product_tmpl_id"):
                         location_id = vals.get("location_id") or speedy.get(
                             "default_location_id"
@@ -370,7 +384,7 @@ class ImportHelpergeneric(models.TransientModel):
                         res = import_obj._create_product(vals, speedy)
                         continue
                 elif template:
-                    if vals.get(reference) in speedy_product_list:
+                    if vals.get(reference) in speedy_product_list and self.update_on:
                         location_id = vals.get("location_id") or speedy.get(
                             "default_location_id"
                         )
@@ -401,6 +415,19 @@ class ImportHelpergeneric(models.TransientModel):
                             else:
                                 logger.warning(f"line {line} have done nothing")
                             continue
+                    elif (
+                        vals.get(reference) in speedy_product_list
+                        and not self.update_on
+                    ):
+                        speedy["logs"]["product.product"].append(
+                            {
+                                "msg": f"Product with {vals[reference]} already exist for line {line}",
+                                "value": vals[reference],
+                                "vals": vals,
+                                "field": f"product.product,{reference}",
+                                "reset": True,
+                            }
+                        )
                     elif vals.get("default_code") in speedy_product_template_list:
                         location_id = vals.get("location_id") or speedy.get(
                             "default_location_id"
@@ -502,7 +529,7 @@ class ImportHelpergeneric(models.TransientModel):
                                 logger.info(f"product variant for {att} create")
                             p_tmpl.default_code = vals["default_code"]
                             logger.info(
-                                f"{p_tmpl.id} has been create with {len(list_attribue_ids)} variant"
+                                f"{p_tmpl.id} has been create with {len(p_tmpl.attribute_line_ids)} variant"
                             )
                         else:
                             logger.info(f"{p_tmpl.id} has been create")

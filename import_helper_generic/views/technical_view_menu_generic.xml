@@ -6,7 +6,8 @@
         <field name="arch" type="xml">
       <form string="Import generic">
         <group name="Files" string="Import file" col="2">
-            <field name="file_import" string="xlsx file"/>
+                    <field name="file_import" string="xlsx file"/>
+                    <field name="update_on" string="Update the value" />
         </group>
                 <group name="main" col="3">
                     <button name="partner_import_generic" type="object" string="Partner import"/>
