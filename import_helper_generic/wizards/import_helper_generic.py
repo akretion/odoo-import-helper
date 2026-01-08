@@ -144,7 +144,7 @@ class ImportHelpergeneric(models.TransientModel):
             }
         return speedy_attribute_value
 
-    def check_vals_product(self, vals):
+    def check_vals_product(self, vals, speedy):
         variant_att = ()
         list_attribute_ids = {}
         template = False
@@ -163,6 +163,15 @@ class ImportHelpergeneric(models.TransientModel):
                         list_attribute_ids[
                             speedy_attribute_value[v]["attribute_id"]
                         ] = [speedy_attribute_value[v]["id"]]
+                else:
+                    speedy["logs"]["product.product"].append(
+                        {
+                            "msg": f"Cannot found attrivutes {v} for {vals['line']}",
+                            "value": v,
+                            "vals": vals,
+                            "field": "product.product,attribute_line_ids",
+                        }
+                    )
 
         if "ref_supplier" in vals:
             speedy_partner_id = self.speedy_partner_id()
@@ -239,7 +248,7 @@ class ImportHelpergeneric(models.TransientModel):
                         vals["ref_template"]
                     ]
                 vals, variant_att, list_attribue_ids, template = (
-                    self.check_vals_product(vals)
+                    self.check_vals_product(vals, speedy)
                 )
                 # if (
                 #     not vals.get("product_tmpl_id")
@@ -308,25 +317,53 @@ class ImportHelpergeneric(models.TransientModel):
                             template = self.env["product.template"].browse(
                                 vals["product_tmpl_id"]
                             )
+                        res_p = False
                         for p in template.product_variant_ids:
                             if p.product_template_attribute_value_ids:
-                                for v in p.product_template_attribute_value_ids:
-                                    if (
-                                        v.product_attribute_value_id.fullname
-                                        in variant_att
-                                    ):
-                                        if vals.get("standard_price"):
-                                            vals["standard_price"] = float(
-                                                vals["standard_price"]
-                                            )
-                                        if vals.get("list_price") and hasattr(
-                                            p, "fix_price"
+                                if not p.barcode:
+                                    for v in p.product_template_attribute_value_ids:
+                                        if (
+                                            v.product_attribute_value_id.fullname
+                                            in variant_att
                                         ):
-                                            vals["fix_price"] = vals["list_price"]
-                                            vals.pop("list_price")
-                                        elif vals.get("list_price"):
-                                            vals.pop("list_price")
-                                        p.write(vals)
+                                            if vals.get("standard_price"):
+                                                vals["standard_price"] = float(
+                                                    vals["standard_price"]
+                                                )
+                                            if vals.get("list_price") and hasattr(
+                                                p, "fix_price"
+                                            ):
+                                                vals["fix_price"] = vals["list_price"]
+                                                vals.pop("list_price")
+                                            elif vals.get("list_price"):
+                                                vals.pop("list_price")
+                                            res_p = p.write(vals)
+                                            logger.info(
+                                                f"product variant {p.id} has been update {v}"
+                                            )
+                                            break
+                                else:
+                                    speedy["logs"]["product.product"].append(
+                                        {
+                                            "msg": f"{p.id} product with {variant_att} already exite",
+                                            "value": variant_att,
+                                            "vals": vals,
+                                            "field": "product.product,attribute_line_ids",
+                                            "reset": True,
+                                        }
+                                    )
+
+                        if not res_p:
+                            speedy["logs"]["product.product"].append(
+                                {
+                                    "msg": f"Not product with {variant_att}",
+                                    "value": variant_att,
+                                    "vals": vals,
+                                    "field": "product.product,attribute_line_ids",
+                                    "reset": True,
+                                }
+                            )
+
                         continue
                     else:
                         res = import_obj._create_product(vals, speedy)
@@ -461,18 +498,28 @@ class ImportHelpergeneric(models.TransientModel):
                                         }
                                     )
                                 ]
+                                logger.info(f"product variant for {att} create")
                             p_tmpl.default_code = vals["default_code"]
                             logger.info(
                                 f"{p_tmpl.id} has been create with {len(list_attribue_ids)} variant"
                             )
                         else:
-                            logger.warning(f"{p_tmpl.id} has been create")
+                            logger.info(f"{p_tmpl.id} has been create")
                             continue
                 # elif (not template or template) and not variant_att:
                 #     res = import_obj._create_product(vals, speedy)
                 #     continue
                 else:
                     logger.warning(f"NO PRODUCT IMPORTED line {line} Name {row[1]}")
+                    speedy["logs"]["product.product"].append(
+                        {
+                            "msg": "Pas d'identification product ou template colonnes type [A]",
+                            "value": row[0],
+                            "vals": vals,
+                            "field": "product.product,product_tmpl_id",
+                            "reset": True,
+                        }
+                    )
             else:
                 break
         for t in speedy_product_template_list:
