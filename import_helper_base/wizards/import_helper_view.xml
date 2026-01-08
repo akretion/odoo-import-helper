@@ -19,6 +19,8 @@
 
                     <field name="ai_engine" invisible="context.get('hide_ai')" />
                     <field name="file" />
+                </group>
+                <group name="logs" string="Logs">
                     <field name="logs" nolabel="1" colspan="2" />
                 </group>
                 <footer>

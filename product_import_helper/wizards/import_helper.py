@@ -3,7 +3,7 @@
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
-from odoo import api, models, Command, _
+from odoo import api, models, fields, Command, _
 from stdnum.ean import is_valid
 from odoo.exceptions import UserError
 
@@ -13,16 +13,42 @@ logger = logging.getLogger(__name__)
 class ImportHelper(models.TransientModel):
     _inherit = "import.helper"
 
+    variant_creation_mode = fields.Selection(
+        string='Creation mode',
+        selection=[('strict', 'Strict: only listed ones, remove other combination')],
+        help="Strict: Will create listed variants in import files, and remove any "
+             "other possible combination. (!) If the database already contains variants "
+             "of product template listed in the import file, they will be removed.\n",
+        default="strict",
+    )
+    variant_price_mode = fields.Selection(
+        string='Price mode',
+        selection=[('fix', 'Fix: sale price at variant instead of template level')],
+        help="Fix: requires OCA module `product_variant_sale_price`",
+        default="fix",
+    )
+
     #===== Import methods =====#
     def _get_sheet_names(self):
         return super()._get_sheet_names() + ['products',]
 
     def _load_sheet_products(self, speedy, headers, vals_list):
         """ Browse `products` worksheet and call `_create_product` """
-        speedy = self._prepare_speedy()
+        products = self.env['product.product']
         for row, vals in enumerate(vals_list, start=2):
             vals |= {'line': 'products_%s' % row}
-            self._create_product(vals, speedy)
+            product = self._create_product(vals, speedy)
+            if product:
+                products |= product
+        
+        if self.variant_creation_mode == 'strict':
+            to_delete = products.product_tmpl_id.product_variant_ids - products
+            if bool(to_delete):
+                logger.info(
+                    '"Strict" mode for variants: removing %d unlisted variants',
+                    len(to_delete),
+                )
+                to_delete.unlink()
 
     #===== Data import logics =====#
     @api.model
@@ -32,9 +58,14 @@ class ImportHelper(models.TransientModel):
         ppo = self.env['product.product']
         speedy.update({
             'currency2id': {},
-            'product_categ2id': {},
+            'categ_name2id': {},
+            'categ_code2id': {},
             'product_barcode2name': {},
             'product_default_code2name': {},
+            'pivot_code_tmpl2tmpl': {}, # col `pivot_code_tmpl` and product.product.default_code to product.template record
+            'attribute_code2id': {},
+            'attribute_name2id': {},
+            'attribute_values': {},
             'pos': hasattr(ppo, 'pos_categ_id'),
             'pos_categ2id': {},
             'account_code2id': {},
@@ -59,26 +90,62 @@ class ImportHelper(models.TransientModel):
                 else:
                     logger.warning('Ignoring fiscal classification %s ID %d', fc.display_name, fc.id)
             logger.info('Fiscal classification map: %s', speedy['vat_rate2fc_id'])
+        
+        # currency
         for cur in self.env['res.currency'].search_read([], ['name']):
             speedy['currency2id'][cur['name']] = cur['id']
-        for categ in self.env['product.category'].search_read([], ['name']):
-            speedy['product_categ2id'][categ['name']] = categ['id']
+        
+        # category
+        Category = self.env['product.category'].with_context(active_test=False)
+        categ_code = hasattr(Category, 'code')
+        for categ in Category.search_read([], ['name'] + (['code'] if categ_code else [])):
+            speedy['categ_name2id'][categ['name']] = categ['id']
+            speedy['categ_code2id'][categ['code']] = categ['id']
+        
+        # pos category
         if speedy['pos']:
             for pos_categ in self.env['pos.category'].search_read([], ['name']):
                 speedy['pos_categ2id'][pos_categ['name']] = pos_categ['id']
+        
+        # warehouse
         wh = self.env['stock.warehouse'].search([('company_id', '=', self.env.company.id)], limit=1)
         if wh:
             speedy['default_location_id'] = wh.lot_stock_id.id
-        products = self.env['product.product'].with_context(active_test=False).search_read([], ['display_name', 'barcode', 'default_code'])
+        
+        # product.product
+        products = self.env['product.product'].with_context(active_test=False).search([])
         for product in products:
-            if product['barcode']:
-                speedy['product_barcode2name'][product['barcode']] = '%s (ID %d)' % (product['display_name'], product['id'])
-            if product['default_code']:
-                speedy['product_default_code2name'][product['default_code']] = '%s (ID %d)' % (product['display_name'], product['id'])
+            speedy['pivot_code_tmpl2tmpl'][product.default_code] = product.product_tmpl_id
+            if product.barcode:
+                speedy['product_barcode2name'][product.barcode] = '%s (ID %d)' % (product.display_name, product.id)
+            if product.default_code:
+                speedy['product_default_code2name'][product.default_code] = '%s (ID %d)' % (product.display_name, product.id)
+        
+        # attributes
+        Attribute = self.env['product.attribute'].with_context(active_test=False)
+        attribute_code = hasattr(Attribute, "code") # if module `product_variant_default_code` is installed
+        fields = ['name'] + (['code'] if attribute_code else []) 
+        for attribute in Attribute.search_read([], fields):
+            speedy['attribute_name2id'][attribute['name']] = attribute['id']
+            if attribute_code:
+                speedy['attribute_code2id'][attribute['code']] = attribute['id']
+            speedy['attribute_values'][attribute['id']] = {'name2id': {}, 'code2id': {}}
+        # attributes values
+        AttributeValues = self.env['product.attribute.value'].with_context(active_test=False)
+        for attribute_value in AttributeValues.search_read([], ['attribute_id'] + fields):
+            attribute_id = attribute_value['attribute_id'][0]
+            attribute_values = speedy['attribute_values'][attribute_id]
+            attribute_values['name2id'][attribute_value['name']] = attribute_value['id']
+            if attribute_code:
+                attribute_values['code2id'][attribute_value['code']] = attribute_value['id']
+
+        # account
         accounts = self.env["account.account"].search_read(
             [("deprecated", "=", False)], ["code"])
         for account in accounts:
             speedy["account_code2id"][account["code"]] = account["id"]
+        
+        # routes
         route_code2xmlid = {
             'buy': 'purchase_stock.route_warehouse0_buy',
             'manufacture': 'mrp.route_warehouse0_manufacture',
@@ -89,6 +156,8 @@ class ImportHelper(models.TransientModel):
             route = self.env.ref(xmlid, raise_if_not_found=False)
             if route:
                 speedy["route_code2id"][route_code] = route.id
+        
+        # intrastat
         if speedy['intrastat']:
             for hscode in self.env['hs.code'].search_read([], ['local_code']):
                 speedy['hs_code2id'][hscode['local_code']] = hscode['id']
@@ -97,11 +166,18 @@ class ImportHelper(models.TransientModel):
     def _create_product(self, vals, speedy, inventory=True, location_id=False):
         stock_qty = vals.get('stock_qty', 0)
         location_id = location_id or speedy.get('default_location_id')
+
         rvals = self._prepare_product_vals(vals, location_id, speedy)
         if not rvals:
             logger.warning('Product on line %s skipped', vals.get('line'))
             return False
-        product = self.env['product.product'].create(rvals)
+        
+        rvals, product = self._create_product_variant(rvals, speedy)
+        if product:
+            product.write(rvals)
+        else:
+            product = self.env['product.product'].create(rvals)
+        
         create_date_dt = self._prepare_create_date(vals, speedy)
         if create_date_dt:
             self._cr.execute(
@@ -110,13 +186,19 @@ class ImportHelper(models.TransientModel):
             self._cr.execute(
                 "UPDATE product_template SET create_date=%s WHERE id=%s",
                 (create_date_dt, product.product_tmpl_id.id))
+        
         vals['display_name'] = product.display_name
         vals['id'] = product.id
+
+        # update speedy
         if product.barcode:
             speedy['product_barcode2name'][product.barcode] = '%s (ID %d)' % (vals['display_name'], vals['id'])
         if product.default_code:
             speedy['product_default_code2name'][product.default_code] = '%s (ID %d)' % (vals['display_name'], vals['id'])
+            speedy['pivot_code_tmpl2tmpl'][product.default_code] = product.product_tmpl_id
         logger.info('New product created: %s ID %d from line %s', product.display_name, product.id, vals['line'])
+
+        # stock level
         if inventory and stock_qty:
             if product.is_storable:
                 self._set_stock_level(product, stock_qty, location_id, speedy)
@@ -128,6 +210,7 @@ class ImportHelper(models.TransientModel):
                     'field': 'product.product,qty_available',
                     'reset': True,
                     })
+        
         return product
 
     def _set_stock_level(self, product, stock_qty, location_id, speedy):
@@ -175,7 +258,7 @@ class ImportHelper(models.TransientModel):
                     'vals': vals,
                     'field': 'product.product,default_code',
                     'reset': True,
-                    })
+                })
                 return False
 
         if vals.get('barcode'):
@@ -228,11 +311,12 @@ class ImportHelper(models.TransientModel):
                     })
         
         if vals.get('categ_name'):
-            if vals['categ_name'] not in speedy['product_categ2id']:
-                categ = self.env['product.category'].create(self._prepare_product_category(vals, speedy))
-                speedy['product_categ2id'][vals['categ_name']] = categ.id
-                logger.info('New category of product created: %s, ID %d', vals['categ_name'], categ.id)
-            vals['categ_id'] = speedy['product_categ2id'][vals['categ_name']]
+            categ_id = speedy['categ_name2id'].get(vals['categ_name']) or speedy['categ_code2id'].get(vals['categ_name'])
+            if not categ_id:
+                categ_id = self.env['product.category'].create(self._prepare_product_category(vals, speedy)).id
+                speedy['categ_name2id'][vals['categ_name']] = categ_id
+                logger.info('New category of product created: name "%s", ID %d', vals['categ_name'], categ_id)
+            vals['categ_id'] = categ_id
         
         if speedy['pos'] and vals.get('pos_categ_name'):
             if vals['pos_categ_name'] not in speedy['pos_categ2id']:
@@ -284,7 +368,7 @@ class ImportHelper(models.TransientModel):
                 
                 # add vals to product's `seller_ids`
                 vals['seller_ids'] = [Command.create(supplierinfo_vals)]
-        
+
         if vals.get('orderpoint_min_qty'):
             if not location_id:
                 raise UserError(_("location_id argument is not set and no warehouse in company '%s'.") % self.env.company.display_name)
@@ -310,7 +394,7 @@ class ImportHelper(models.TransientModel):
             # field 'responsible_id' is add by the module 'stock'
             # Avoid to have current user as responsible for all imported products !
             vals['responsible_id'] = False
-        # intrastat
+        
         if speedy['intrastat']:
             if vals.get('origin_country_name'):
                 origin_country_id = self._match_country(
@@ -328,18 +412,136 @@ class ImportHelper(models.TransientModel):
                         'field': 'product.product,hs_code_id',
                         'reset': True,
                         })
+        
         # Remove all keys that start with supplier_
         # vals will keep the original keys
         # rvals will be used for create(), so we need to remove all the keys are don't exist on res.partner
+        # EXCEPT keep keys for `_create_product_variant`
         rvals = dict(vals)
-        for key in ['line', 'create_date', 'vat_rate', 'categ_name', 'pos_categ_name', 'stock_qty', 'route_codes', 'income_account_code', 'expense_account_code', 'origin_country_name', 'hs_code_code']:
+        for key in ['create_date', 'vat_rate', 'categ_name', 'pos_categ_name', 'stock_qty', 'route_codes', 'income_account_code', 'expense_account_code', 'origin_country_name', 'hs_code_code']:
             if key in rvals:
                 rvals.pop(key)
         for key in vals.keys():
-            if key != 'orderpoint_ids' and (key.startswith('supplier_') or key.startswith('orderpoint_')):
+            if key.startswith('supplier_') or key.startswith('orderpoint_') and key != 'orderpoint_ids':
                 rvals.pop(key)
-    
+        
         return rvals
+
+    def _create_product_variant(self, vals, speedy):
+        """ Creates a product variant if `pivot_code_tmpl` and `attr_xxx` cols are in `rvals`
+            else, return False and let standard workflow to create the product.product
+
+            Product variant creation strategy:
+            1. Populate product.template field `attribute_line_ids`
+            2. Let Odoo create the variant(s) (like through UI)
+            3. Catch back the created `product.product` and update it with `rvals`
+            4. Remove possibly non-explicitely desired variants
+        """
+        prefix = "attr_"
+
+        rvals = dict(vals)
+        rvals.pop('line')
+        if not 'pivot_code_tmpl' in vals:
+            return rvals, False
+        else:
+            # finish to clean rvals
+            # do it here for upcoming product.template creation
+            for key in vals.keys():
+                if key.startswith(prefix):
+                    rvals.pop(key)
+            rvals.pop('pivot_code_tmpl')
+        
+        variant, attributes = False, {}
+        # get variant attribute & value
+        for header, value in vals.items():
+            if not value or not header.startswith(prefix):
+                continue
+
+            if not vals.get('pivot_code_tmpl'):
+                raise UserError(_("To create product variant, column `pivot_code_tmpl` is required."))
+            attribute = header[len(prefix):]
+
+            # get or create attribute
+            attribute_id = speedy['attribute_code2id'].get(attribute) or speedy['attribute_name2id'].get(attribute)
+            if not attribute_id:
+                attribute_id = self.env['product.attribute'].create({'name': attribute}).id
+                speedy['attribute_name2id'][attribute] = attribute_id
+                speedy['attribute_values'][attribute_id] = {'name2id': {}, 'code2id': {}}
+            # get or create attribute value
+            attribute_values = speedy['attribute_values'].get(attribute_id, {'name2id': {}, 'code2id': {}})
+            value_id = attribute_values['code2id'].get(value) or attribute_values['name2id'].get(value)
+            if not value_id:
+                value_id = self.env['product.attribute.value'].create({
+                    'name': value, 'attribute_id': attribute_id
+                }).id
+                speedy['attribute_values'][attribute_id]['name2id'][value] = value_id
+            
+            attributes[attribute_id] = value_id
+        
+        if attributes:
+            if 'list_price' in rvals and self.variant_price_mode != 'fix':
+                raise UserError(_(
+                    "To set the sale price on the variant, install the OCA module `product_variant_sale_price` "
+                    "and choose 'Fix' option for 'Variant price mode'."
+                ))
+            
+            # 1. create product template or update existing
+            product_tmpl = speedy['pivot_code_tmpl2tmpl'].get(vals['pivot_code_tmpl'])
+            if not bool(product_tmpl):
+                attribute_line_vals = [
+                    Command.create({
+                        'attribute_id': attribute_id,
+                        'value_ids': [Command.link(value_id)],
+                    })
+                    for attribute_id, value_id in attributes.items()
+                ]
+                product_tmpl = self.env['product.template'].create(
+                    rvals | {'attribute_line_ids': attribute_line_vals}
+                )
+                speedy['pivot_code_tmpl2tmpl'][vals['pivot_code_tmpl']] = product_tmpl
+                variant = product_tmpl.product_variant_ids
+                logger.info(
+                    'New TEMPLATE created: %s ID %d from line %s',
+                    product_tmpl.display_name, product_tmpl.id, vals['line'],
+                )
+            else:
+                # 2. update existing product template: add attributes' values
+                for attribute_id, value_id in attributes.items():
+                    attribute_line = product_tmpl.attribute_line_ids.filtered(
+                        lambda x: x.attribute_id.id == attribute_id
+                    )
+                    if attribute_line:
+                        # add value to an existing attribute line
+                        attribute_line.value_ids = [Command.link(value_id)]
+                    else:
+                        # add 1 attribute line
+                        product_tmpl.attribute_line_ids = [Command.create({
+                            'attribute_id': attribute_id,
+                            'value_ids': [Command.link(value_id)],
+                        })]
+                        product_tmpl._create_variant_ids()
+
+                # 3. catch back the created product
+                # because of variant-combination logics, several products might
+                # just have been created, or none. Let's find the single one we want,
+                # amongh those just created or already existing
+                for product in product_tmpl.product_variant_ids:
+                    is_combination = bool(
+                        product.product_template_attribute_value_ids.filtered(
+                            lambda x: x.product_attribute_value_id.id == value_id
+                        )
+                    )
+                    if is_combination:
+                        variant = product
+                        break
+                
+                if not variant:
+                    raise UserError(_(
+                        "Variant not found. line: %s | default_code: %s | pivot_code_tmpl: %s",
+                        vals.get('line'), vals.get('default_code'), vals.get('pivot_code_tmpl')
+                    ))
+        
+        return rvals, variant
 
     def _prepare_product_category(self, vals, speedy):
         return {'name': vals['categ_name']}
