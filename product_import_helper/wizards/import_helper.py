@@ -186,6 +186,7 @@ class ImportHelper(models.TransientModel):
     # - supplier_product_name
     # - supplier_min_qty
     # - supplier_delay
+    # - supplier_product_id
     # - categ_name
     # - pos_categ_name
     # - stock_qty
@@ -307,6 +308,7 @@ class ImportHelper(models.TransientModel):
                 "product_code": vals.get("supplier_product_code"),
                 "product_name": vals.get("supplier_product_name"),
                 "min_qty": vals.get("supplier_min_qty"),
+                "product_id": vals.get("supplier_product_id"),
             }
             if vals.get("supplier_delay"):
                 supplierinfo_vals["delay"] = vals["supplier_delay"]

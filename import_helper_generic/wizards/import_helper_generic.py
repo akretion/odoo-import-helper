@@ -185,6 +185,51 @@ class ImportHelpergeneric(models.TransientModel):
                 vals.pop(i)
         return vals, variant_att, list_attribute_ids, template
 
+    def product_seller_update(self, vals, record, speedy):
+        supplierinfo_vals = {}
+        if vals.get("supplier_id"):
+            supplierinfo_vals = {
+                "partner_id": vals["supplier_id"],
+                "price": vals.get("supplier_price"),
+                "product_code": vals.get("supplier_product_code"),
+                "product_name": vals.get("supplier_product_name"),
+                "min_qty": vals.get("supplier_min_qty"),
+                "product_id": vals.get("supplier_product_id"),
+            }
+            if vals.get("supplier_delay"):
+                supplierinfo_vals["delay"] = vals["supplier_delay"]
+            if vals.get("supplier_currency"):
+                if isinstance(vals["supplier_currency"], int):
+                    supplierinfo_vals["currency_id"] = vals["supplier_currency"]
+                elif isinstance(vals["supplier_currency"], str):
+                    currency = vals["supplier_currency"].upper().strip()
+                    if currency in speedy["currency2id"]:
+                        supplierinfo_vals["currency_id"] = speedy["currency2id"][
+                            currency
+                        ]
+                    else:
+                        speedy["logs"]["product.product"].append(
+                            {
+                                "msg": "%s is not a known currency ISO code" % currency,
+                                "value": currency,
+                                "vals": vals,
+                                "field": "product.supplierinfo,currency_id",
+                                "reset": True,
+                            }
+                        )
+        for seller in record.seller_ids:
+            if seller.partner_id.id == supplierinfo_vals["partner_id"] and (
+                seller.product_code == supplierinfo_vals.get("product_code")
+                or seller.product_name == supplierinfo_vals.get("product_name")
+            ):
+                vals["seller_ids"] = [Command.update(seller.id, supplierinfo_vals)]
+                vals.pop("supplier_id")
+                return vals
+
+        vals["seller_ids"] = [Command.create(supplierinfo_vals)]
+        vals.pop("supplier_id")
+        return vals
+
     def product_import_generic(self):
         fileobj = NamedTemporaryFile(
             "wb+", prefix="odoo-import_helper-", suffix=".xlsx"
@@ -203,16 +248,10 @@ class ImportHelpergeneric(models.TransientModel):
             if row[0] == "Information":
                 if row[1] == "Champ de reference":
                     reference = row[2]
-        product_ids = self.env["product.product"].search_read(
-            [], ["default_code", "barcode"]
-        )
+        product_ids = self.env["product.product"].search_read([], [reference])
         speedy_product_list = {}
-        if reference == "default_code":
-            for p in product_ids:
-                speedy_product_list[p["default_code"]] = p["id"]
-        if reference == "barcode":
-            for p in product_ids:
-                speedy_product_list[p["barcode"]] = p["id"]
+        for p in product_ids:
+            speedy_product_list[p[reference]] = p["id"]
         product_template_ids = self.env["product.template"].search_read(
             [], ["default_code_import"]
         )
@@ -286,6 +325,10 @@ class ImportHelpergeneric(models.TransientModel):
                                 vals.pop("default_code")
                             if vals.get("barcode") == record.barcode:
                                 vals.pop("barcode")
+                            if record.seller_ids:
+                                if record.product_template_attribute_value_ids:
+                                    vals["supplier_product_id"] = record.id
+                                vals = self.product_seller_update(vals, record, speedy)
                             vals = import_obj._prepare_product_vals(
                                 vals, location_id, speedy
                             )
@@ -319,12 +362,6 @@ class ImportHelpergeneric(models.TransientModel):
                         location_id = vals.get("location_id") or speedy.get(
                             "default_location_id"
                         )
-                        vals = import_obj._prepare_product_vals(
-                            vals, location_id, speedy
-                        )
-                        if not vals:
-                            logger.warning("Product on line %s skipped", line)
-                            continue
                         if vals["product_tmpl_id"] in list_product_create:
                             template = list_product_create[vals["product_tmpl_id"]]
                         else:
@@ -341,6 +378,15 @@ class ImportHelpergeneric(models.TransientModel):
                                     )
 
                                 if fullname_att == variant_att and not p.barcode:
+                                    vals["supplier_product_id"] = p.id
+                                    vals = import_obj._prepare_product_vals(
+                                        vals, location_id, speedy
+                                    )
+                                    if not vals:
+                                        logger.warning(
+                                            "Product on line %s skipped", line
+                                        )
+                                        continue
                                     if vals.get("standard_price"):
                                         vals["standard_price"] = float(
                                             vals["standard_price"]
@@ -399,6 +445,10 @@ class ImportHelpergeneric(models.TransientModel):
                                 vals.pop("default_code")
                             if vals.get("barcode") == record.barcode:
                                 vals.pop("barcode")
+                            if record.seller_ids:
+                                if record.product_template_attribute_value_ids:
+                                    vals["supplier_product_id"] = record.id
+                                vals = self.product_seller_update(vals, record, speedy)
                             vals = import_obj._prepare_product_vals(
                                 vals, location_id, speedy
                             )
@@ -445,6 +495,8 @@ class ImportHelpergeneric(models.TransientModel):
                                 location_id = record.location_id
                             if vals.get("barcode") == record.barcode:
                                 vals.pop("barcode")
+                            if record.seller_ids:
+                                vals = self.product_seller_update(vals, record, speedy)
                             vals = import_obj._prepare_product_vals(
                                 vals, location_id, speedy
                             )
