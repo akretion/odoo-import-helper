@@ -218,7 +218,7 @@ class ImportHelpergeneric(models.TransientModel):
                             }
                         )
         for seller in record.seller_ids:
-            if seller.partner_id.id == supplierinfo_vals["partner_id"] and (
+            if seller.partner_id.id == supplierinfo_vals.get("partner_id") and (
                 seller.product_code == supplierinfo_vals.get("product_code")
                 or seller.product_name == supplierinfo_vals.get("product_name")
             ):
