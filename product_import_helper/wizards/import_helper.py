@@ -107,6 +107,11 @@ class ImportHelper(models.TransientModel):
             for pos_categ in self.env['pos.category'].search_read([], ['name']):
                 speedy['pos_categ2id'][pos_categ['name']] = pos_categ['id']
         
+        # tags
+        if speedy['tags2id']:
+            for tag in self.env['product.tag'].search_read([], ['name']):
+                speedy['tags2id'][tag['name']] = tag['id']
+
         # warehouse
         wh = self.env['stock.warehouse'].search([('company_id', '=', self.env.company.id)], limit=1)
         if wh:
@@ -323,6 +328,15 @@ class ImportHelper(models.TransientModel):
                 pos_categ = self.env['pos.category'].create(self._prepare_pos_category(vals, speedy))
                 speedy['pos_categ2id'][vals['pos_categ_name']] = pos_categ.id
             vals['pos_categ_id'] = speedy['pos_categ2id'][vals['pos_categ_name']]
+
+        if vals.get('tags'):
+            tags = vals['tags'].split(',')
+            # create missing ones
+            to_create = [tag for tag in tags if tag not in speedy['tags2id']]
+            for tag_name in to_create:
+                speedy['tags2id'][tag_name] = self.env['product.tag'].create({'name': tag_name}).id
+            vals['product_tag_ids'] = [Command.link(speedy['tags2id'][tag]) for tag in tags]
+            del vals['tags']
 
         supplierinfo_vals = {}
         if vals.get('supplier_id') or vals.get('supplier_code'):
@@ -548,7 +562,7 @@ class ImportHelper(models.TransientModel):
 
     def _prepare_pos_category(self, vals, speedy):
         return {'name': vals['pos_categ_name']}
-
+    
     def _match_and_update_account(self, acc_type, vals, speedy):
         odoo_field = f'property_account_{acc_type}_id'
         import_code = f'{acc_type}_account_code'
