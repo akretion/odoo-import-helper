@@ -11,15 +11,8 @@
     "author": " Akretion",
     "license": "AGPL-3",
     "installable": False,
-    "external_dependencies": {
-        "python": [],
-        "bin": [],
-    },
     "depends": [
         "pattern_import_export",
         "product_import_helper",
     ],
-    "data": [],
-    "demo": [],
-    "qweb": [],
 }
