@@ -1,0 +1,4 @@
+openpyxl
+openai
+pycountry
+unidecode
