@@ -336,7 +336,6 @@ class ImportHelper(models.TransientModel):
             for tag_name in to_create:
                 speedy['tags2id'][tag_name] = self.env['product.tag'].create({'name': tag_name}).id
             vals['product_tag_ids'] = [Command.link(speedy['tags2id'][tag]) for tag in tags]
-            del vals['tags']
 
         supplierinfo_vals = {}
         if vals.get('supplier_id') or vals.get('supplier_code'):
@@ -432,7 +431,7 @@ class ImportHelper(models.TransientModel):
         # rvals will be used for create(), so we need to remove all the keys are don't exist on res.partner
         # EXCEPT keep keys for `_create_product_variant`
         rvals = dict(vals)
-        for key in ['create_date', 'vat_rate', 'categ_name', 'pos_categ_name', 'stock_qty', 'route_codes', 'income_account_code', 'expense_account_code', 'origin_country_name', 'hs_code_code']:
+        for key in ['create_date', 'vat_rate', 'categ_name', 'pos_categ_name', 'stock_qty', 'route_codes', 'income_account_code', 'expense_account_code', 'origin_country_name', 'hs_code_code', 'tags']:
             if key in rvals:
                 rvals.pop(key)
         for key in vals.keys():
