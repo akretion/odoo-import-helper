@@ -1,3 +1,4 @@
+import string
 from typing import dataclass_transform
 from decorator import append
 from openpyxl.workbook import child
@@ -26,7 +27,6 @@ LIST_COL_POP = [
     "invoice_mobile",
     "invoice_lang",
     "delivery_name",
-    "delivery_title_code",
     "delivery_street",
     "delivery_street2",
     "delivery_city",
@@ -217,17 +217,17 @@ class ImportHelpergeneric(models.TransientModel):
                                 "reset": True,
                             }
                         )
-        for seller in record.seller_ids:
-            if seller.partner_id.id == supplierinfo_vals.get("partner_id") and (
-                seller.product_code == supplierinfo_vals.get("product_code")
-                or seller.product_name == supplierinfo_vals.get("product_name")
-            ):
-                vals["seller_ids"] = [Command.update(seller.id, supplierinfo_vals)]
-                vals.pop("supplier_id")
-                return vals
+            for seller in record.seller_ids:
+                if seller.partner_id.id == supplierinfo_vals["partner_id"] and (
+                    seller.product_code == supplierinfo_vals.get("product_code")
+                    or seller.product_name == supplierinfo_vals.get("product_name")
+                ):
+                    vals["seller_ids"] = [Command.update(seller.id, supplierinfo_vals)]
+                    vals.pop("supplier_id")
+                    return vals
 
-        vals["seller_ids"] = [Command.create(supplierinfo_vals)]
-        vals.pop("supplier_id")
+            vals["seller_ids"] = [Command.create(supplierinfo_vals)]
+            vals.pop("supplier_id")
         return vals
 
     def product_import_generic(self):

@@ -26,7 +26,7 @@ class ImportHelper(models.TransientModel):
                 "product_categ2id": {},
                 "product_barcode2name": {},
                 "product_default_code2name": {},
-                "pos": hasattr(ppo, "pos_categ_id"),
+                "pos": hasattr(ppo, "pos_categ_ids"),
                 "pos_categ2id": {},
                 "account_code2id": {},
                 "route_code2id": {},
@@ -293,12 +293,19 @@ class ImportHelper(models.TransientModel):
                 speedy["product_categ2id"][vals["categ_name"]] = categ.id
             vals["categ_id"] = speedy["product_categ2id"][vals["categ_name"]]
         if speedy["pos"] and vals.get("pos_categ_name"):
-            if vals["pos_categ_name"] not in speedy["pos_categ2id"]:
-                pos_categ = self.env["pos.category"].create(
-                    self._prepare_pos_category(vals, speedy)
-                )
-                speedy["pos_categ2id"][vals["pos_categ_name"]] = pos_categ.id
-            vals["pos_categ_id"] = speedy["pos_categ2id"][vals["pos_categ_name"]]
+            names = vals["pos_categ_name"].split(",")
+            list_categ_id = []
+            for name in names:
+                if name.startswith(" "):
+                    name.replace(" ", "", 1)
+                if name not in speedy["pos_categ2id"]:
+                    pos_categ = self.env["pos.category"].create(
+                        {"name": name}
+                        # self._prepare_pos_category(vals, speedy)
+                    )
+                    speedy["pos_categ2id"][vals["pos_categ_name"]] = pos_categ.id
+                list_categ_id.append(speedy["pos_categ2id"][name])
+            vals["pos_categ_ids"] = [Command.set(list_categ_id)]
 
         supplierinfo_vals = {}
         if vals.get("supplier_id"):
