@@ -88,7 +88,7 @@ class ImportHelper(models.TransientModel):
         if not rvals:
             logger.warning('Product on line %s skipped', vals.get('line'))
             return False
-        product = self.env['product.product'].create(rvals)
+        product = self.env['product.product'].with_context(mail_create_nosubscribe=True).create(rvals)
         create_date_dt = self._prepare_create_date(vals, speedy)
         if create_date_dt:
             self._cr.execute(
@@ -212,7 +212,7 @@ class ImportHelper(models.TransientModel):
                     })
         if vals.get('categ_name'):
             if vals['categ_name'] not in speedy['product_categ2id']:
-                categ = self.env['product.category'].create(self._prepare_product_category(vals, speedy))
+                categ = self.env['product.category'].with_context(mail_create_nosubscribe=True).create(self._prepare_product_category(vals, speedy))
                 speedy['product_categ2id'][vals['categ_name']] = categ.id
             vals['categ_id'] = speedy['product_categ2id'][vals['categ_name']]
         if speedy['pos'] and vals.get('pos_categ_name'):

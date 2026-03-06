@@ -95,7 +95,7 @@ class ImportHelper(models.TransientModel):
         rvals = self._prepare_partner_vals(
             vals, speedy, email_check_deliverability=email_check_deliverability,
             create_bank=create_bank)
-        partner = self.env['res.partner'].create(rvals)
+        partner = self.env['res.partner'].with_context(mail_create_nosubscribe=True).create(rvals)
         create_date_dt = self._prepare_create_date(vals, speedy)
         if create_date_dt:
             self._cr.execute(
