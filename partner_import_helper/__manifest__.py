@@ -11,9 +11,12 @@
     'author': 'Akretion',
     'website': 'https://github.com/akretion/odoo-import-helper',
     'depends': [
+        'account',
         'import_helper_base',
+        'l10n_fr',
         'phone_validation',  # would be nice to avoid depending on it ?
-        ],
-    "external_dependencies": {"python" : ["email-validator"]},
+    ],
+    'data': ['wizards/import_helper_wizard.xml',],
+    "external_dependencies": {"python" : ["email-validator",]},
     'installable': True,
 }

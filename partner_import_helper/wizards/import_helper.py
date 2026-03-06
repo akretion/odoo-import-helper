@@ -2,13 +2,14 @@
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
-from odoo import api, models, Command, _
+from odoo import api, models, fields, Command, _
 from odoo.exceptions import UserError
 from odoo.addons.phone_validation.tools import phone_validation
 from odoo.tools import plaintext2html
 
 import re
 import copy
+
 from stdnum.eu.vat import is_valid as vat_is_valid, check_vies
 from stdnum.iban import is_valid as iban_is_valid
 from stdnum.fr.siret import is_valid as siret_is_valid
@@ -21,11 +22,132 @@ logger = logging.getLogger(__name__)
 
 class ImportHelper(models.TransientModel):
     _inherit = 'import.helper'
+    
+    #===== Import methods =====#
+    def _get_sheet_names(self):
+        return super()._get_sheet_names() + ['companies', 'contacts', 'banks',]
+
+    def _get_companies_address_types(self):
+        """ Suffixes of col names for company's address types
+            :return: ['contact', 'invoice', 'delivery', 'other']
+        """
+        return [x[0] for x in self.env['res.partner']._fields['type'].selection]
+    
+    def _get_company_vals_default(self):
+        return {
+            'is_company': True,
+            'lang': 'fr_FR',
+            'country_name': 'FRA',
+        }
+    
+    def _get_company_address_vals_default(self):
+        return {
+            'is_company': False,
+            'lang': 'fr_FR',
+            'country_name': 'FRA',
+        }
+    
+    def _load_sheet_companies(self, speedy, headers, vals_list):
+        """ Browse `companies` worksheet data in `vals_list`
+             and call `_create_partner` to create companies and sub-addresses
+
+            1 line contains:
+             * company details
+             * 1 bank account information
+             * 1 invoice address details
+             * 1 delivery address details
+
+             Invoice and Delivery adresses may also be managed in `contacts` tab.
+             They are here because it can be convenient to manage them directly linked to the company,
+             if your customer only has 1 adress of this kind per company.
+        """
+        address_types = self._get_companies_address_types()
+        company_fields = [
+            x for x in headers
+            if all([not x.startswith(address + '_') for address in address_types])
+        ]
+
+        company_vals_default = self._get_company_vals_default()
+        address_vals_default = self._get_company_address_vals_default()
+
+        row = 2
+        for vals in vals_list:
+            addresses_vals_list = []
+            for address in address_types:
+                address_vals = {}
+                for col_name, value in vals.copy().items():
+                    if col_name.startswith(address + '_'):
+                        address_vals |= {col_name.replace(address + '_', ''): str(value).strip()}
+                        vals.pop(col_name)
+                if address_vals:
+                    addresses_vals_list.append(address_vals_default | {'type': address} | address_vals)
+            
+            vals = company_vals_default | {
+                k: v for k, v in vals.items()
+                if k in company_fields
+            } | {
+                'child_ids': [(0, 0, vals) for vals in addresses_vals_list],
+                'line': 'companies_%d' % row,
+            }
+            self.sudo()._create_partner(vals, speedy) # sudo for multi-company
+            row += 1
+
+    def _load_sheet_contacts(self, speedy, headers, vals_list):
+        """ Browse `contacts` sheet to create:
+             a) if `ref` is given: sub-level contact of company
+             b) else, 1st level person
+        """
+        row = 2
+        Partner = self.env['res.partner'].sudo().with_context(active_test=False) # sudo for private addresses
+        speedy['partner_parent_ids'] = {
+            (x.ref, x.company_id.partner_id.ref): x.id
+            for x in Partner.search([])
+        }
+        for vals in vals_list:
+            if vals['ref']:
+                company_ref = vals['company_ref'].strip() or False if 'company_ref' in headers else self.env.company.partner_id.ref
+                parent_id = speedy['partner_parent_ids'].get((vals['ref'], company_ref))
+                if not parent_id:
+                    raise UserError(_("In `contacts` tab, parent ref %s not found in company %s", vals['ref'], company_ref))
+                vals |= {
+                    'parent_id': parent_id,
+                    'line': 'contacts_%d' % row,
+                }
+                del vals['ref']
+            self.sudo()._create_partner(vals, speedy) # sudo for multi-company
+            row += 1
+
+    def _load_sheet_banks(self, speedy, headers, vals_list):
+        """ Browse `banks` sheet to add IBAN to companies
+             and create banks if needed
+        """
+        row = 2
+        Partner = self.env['res.partner'].sudo().with_context(active_test=False) # sudo for private addresses
+        speedy['partners'] = {
+            (x.ref, x.company_id.partner_id.ref): x
+            for x in Partner.search([])
+        }
+        for vals in vals_list:
+            company_ref = vals['company_ref'].strip() or False if 'company_ref' in headers else self.env.company.partner_id.ref
+            partner = speedy['partners'].get((vals['ref'], company_ref))
+            if not partner:
+                raise UserError(_("In `banks` tab, parent ref %s not found in company %s", vals['ref'], company_ref))
+            
+            # creates banks, returns 'bank_ids' key in vals
+            vals |= {'line': 'banks_%d' % row,}
+            rvals = self._prepare_partner_vals(vals, speedy)
+            if 'bank_ids' in rvals:
+                partner.write(rvals)
+                logger.info('Bank added: %s to partner %s from line %s', vals['iban'], partner.id, vals['line'])
+            else:
+                logger.info('Bank ignored: partner %s, line %s', partner.id, vals['line'])
+            
+            row += 1
 
     # TODO add support for states
     @api.model
-    def _prepare_speedy(self, aiengine='chatgpt'):
-        speedy = super()._prepare_speedy(aiengine=aiengine)
+    def _prepare_speedy(self):
+        speedy = super()._prepare_speedy()
         speedy["logs"]["res.partner"] = []
         speedy.update({
             "o2m_phone": hasattr(self.env['res.partner'], 'phone_ids'),
@@ -45,6 +167,8 @@ class ImportHelper(models.TransientModel):
                     'prof': self.env.ref('base.res_partner_title_prof').id,
                 },
             },
+            'company': {},
+            'categories': {},
             'industry_name2id': {},
             'fiscal_position': {},
             # _phone_get_number_fields() is a method of phone_validation that return ['phone', 'mobile']
@@ -56,6 +180,10 @@ class ImportHelper(models.TransientModel):
             speedy['bank']['bic2name'][bic] = bank['name']
         for indus in self.env['res.partner.industry'].with_context(active_test=False).search_read([('name', '!=', False)], ['name']):
             speedy['industry_name2id'][indus['name']] = indus['id']
+        for categories in self.env['res.partner.category'].with_context(active_test=False).search_read([('name', '!=', False)], ['name']):
+            speedy['categories'][categories['name']] = categories['id']
+        for company in self.env['res.company'].with_context(active_test=False).sudo().search([]):
+            speedy['company'][company.partner_id.ref] = company.id
         if (
                 self.env.company.country_id.code == 'FR' and
                 hasattr(self.env['res.partner'], 'property_account_position_id') and
@@ -103,7 +231,7 @@ class ImportHelper(models.TransientModel):
                 (create_date_dt, partner.id))
         vals['display_name'] = partner.display_name
         vals['id'] = partner.id
-        logger.info('New partner created: %s ID %d from line %d', partner.display_name, partner.id, vals['line'])
+        logger.info('New partner created: %s ID %d from line %s', partner.display_name, partner.id, vals['line'])
         return partner
 
     @api.model
@@ -250,7 +378,17 @@ class ImportHelper(models.TransientModel):
                 'value': 'Individual',
                 'vals': vals,
                 'field': 'res.partner,is_company',
-                })
+            })
+        # company_id
+        if vals.get('company_ref'):
+            if vals['company_ref'] not in speedy['company']:
+                raise UserError(_("Company %s does not exist in Odoo. Contact not imported.", vals['company_ref']))
+            else:
+                # set company_id on the contact and its children
+                company_id = speedy['company'][vals['company_ref']]
+                vals['company_id'] = company_id
+                for child in vals.get('child_ids', {}):
+                    child['company_id'] = company_id
         # VAT
         vat = False
         if vals.get('vat') and (not country_id or country_id in speedy['eu_country_ids']):
@@ -456,6 +594,15 @@ class ImportHelper(models.TransientModel):
                 vals['siret'] = False
             else:
                 vals.pop('siren')
+        # CATEGORIES
+        if vals.get('categories'):
+            vals_categories = []
+            categories = vals.get('categories').split(',')
+            for category in categories:
+                if category not in speedy['categories']:
+                    speedy['categories'][category] = self.env['res.partner.category'].create({'name': category}).id
+                vals_categories += [Command.link(speedy['categories'][category])]
+            vals['category_id'] = vals_categories
         # INDUSTRY
         if vals.get('industry_name'):
             if vals['industry_name'] not in speedy['industry_name2id']:
@@ -563,7 +710,8 @@ class ImportHelper(models.TransientModel):
 
     def _remove_technical_keys(self, rvals):
         keys_to_remove = [
-            'line', 'create_date', 'iban', 'bic', 'bank_name', 'industry_name',
+            'line', 'create_date', 'company_ref', 'iban', 'bic', 'bank_name',
+            'industry_name', 'categories',
             'siren_or_siret', 'title_code', 'country_name', 'comment_txt',
             'customer_payment_term_code', 'supplier_payment_term_code']
         for key in keys_to_remove:
@@ -576,7 +724,7 @@ class ImportHelper(models.TransientModel):
 
     def _prepare_industry(self, vals, speedy):
         return {'name': vals['industry_name']}
-
+    
     def _phone_number_clean(self, number, country_code, phone_field, vals, speedy):
         try:
             clean_number = phone_validation.phone_format(

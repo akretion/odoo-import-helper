@@ -2,8 +2,9 @@
 Partner Import Helper
 =====================
 
-This module adds methods to help on the import of partners:
+This module adds methods to help on the import of partners and a wizard accessible from Technical menu to import the .xlsx template suggested in *data* folder.
 
+Example of helper methods for partners import:
 - help to match a country ID from a country name
 - help to match title
 - help to validate email adresses
@@ -19,10 +20,15 @@ Configuration
 
 Edit the Odoo server configuration file and add an entry **openai_api_key** that contains your OpenAI API key.
 
+The .xlsx should be cleaned before import, so all sheets is in standard Odoo import format (like .csv):
+* 1st row: fields name
+* 1st column: start of values
+The wizard will look at 3 sheets if they exists: *companies*, *contacts* and *banks*.
+
 Sample code
 ===========
 
-Here is some sample code:
+Here is some sample code.
 
 .. code::
 

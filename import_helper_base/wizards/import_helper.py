@@ -9,27 +9,112 @@ from datetime import datetime
 from unidecode import unidecode
 import re
 
+import base64, io
+import traceback
 import logging
 logger = logging.getLogger(__name__)
+
 
 try:
     import pycountry
 except ImportError:
     logger.debug('Cannot import pycountry')
+
 try:
     from openai import OpenAI
 except ImportError:
     logger.debug('Cannot import openai')
+
+try:
+    import openpyxl
+except ImportError:
+    logger.debug('Cannot import openpyxl')
 
 
 class ImportHelper(models.TransientModel):
     _name = "import.helper"
     _description = "Helper to import data in Odoo"
 
+    ai_engine = fields.Selection(
+        string='AI engine',
+        selection=[('chatgpt', 'ChatGPT')],
+        default=False,
+        help="If used, the import will send AI requests to improve data quality"
+             "(only when helpful), like correcting country names into ISO country codes.",
+    )
+    file = fields.Binary(string='File')
     logs = fields.Html(readonly=True)
 
+    #====== File import methods ======#
+    def button_download_template(self):
+        url = self._context.get('template_path')
+        if url:
+            return {
+                'type': 'ir.actions.act_url',
+                'name': _('Download import template'),
+                'target': 'download',
+                'url': url,
+            }
+
+    def _get_sheet_names(self):
+        """ Sheet name of XLSX template
+            To inherit (e.g. in `partner_import_helper`, `product_import_helper`)
+        """
+        return []
+    
+    def button_import_file(self):
+        """ Button pressed by user, triggering the import methods """
+        # read xlsx
+        try:
+            bin_data = base64.b64decode(self.file)
+            data = io.BytesIO(bin_data)
+            workbook = openpyxl.load_workbook(data)
+        except ImportError:
+            logger.debug('Cannot open file. Maybe missing openpyxl requirement?')
+            return
+        
+        sheets = {name: workbook[name] for name in self._get_sheet_names() if name in workbook}
+
+        # load sheets and commit data to database
+        speedy = self._prepare_speedy()
+        for sheet_name, sheet in sheets.items():
+            method = '_load_sheet_' + sheet_name
+            if hasattr(self, method):
+                logger.info("Loading sheet: %s", sheet_name)
+                headers, vals_list = self._sheet_to_dict(sheet)
+                getattr(self, method)(speedy, headers, vals_list)
+            else:
+                logger.warning("Sheet ignored: %s", sheet_name)
+        
+        return self._result_action(speedy)
+
+    def _sheet_to_dict(self, worksheet):
+        """ Transform `worksheet` into a `vals_list` """
+        # Get headers: {'col_name': col_index}
+        headers, col_index, col_name = {}, 1, True
+        while col_name:
+            col_name = worksheet.cell(1, col_index).value
+            if bool(col_name):
+                headers[col_name] = col_index
+            col_index += 1
+        
+        # Read rows
+        vals_list = []
+        for row in range(2, worksheet.max_row+1):
+            vals = {}
+            for col_name, col_index in headers.items():
+                value = worksheet.cell(row, col_index).value
+                if isinstance(value, str):
+                    value = value.strip()
+                if value not in (None, ''): # filter empty cells
+                    vals[col_name] = value
+            vals_list.append(vals)
+        
+        return headers, vals_list
+
+    #===== Data logics methods =====#
     @api.model
-    def _prepare_speedy(self, aiengine='chatgpt'):
+    def _prepare_speedy(self):
         logger.debug('Start to prepare import speedy')
         speedy = {
             # country is used both for partner and product
@@ -45,7 +130,7 @@ class ImportHelper(models.TransientModel):
                 'id2code': {},  # used to check iban and vat number prefixes
                 'code2name': {},  # used in log messages
                 },
-            'aiengine': aiengine,
+            'aiengine': self.ai_engine,
             'field2label': {},
             'logs': {},
         # 'logs' is a dict {'res.partner': [], 'product.product': []}
@@ -75,7 +160,7 @@ class ImportHelper(models.TransientModel):
             for country in self.env['res.country'].with_context(lang=lang.code).search_read([], ['code', 'name']):
                 country_name_match = self._prepare_country_name_match(country['name'])
                 cyd['name2code'][country_name_match] = country['code']
-        if aiengine == 'chatgpt':
+        if self.ai_engine == 'chatgpt':
             openai_api_key = tools.config.get('openai_api_key', False)
             if not openai_api_key:
                 raise UserError(_(
@@ -115,38 +200,48 @@ class ImportHelper(models.TransientModel):
             return country_id
         logger.info("No direct match for country '%s': now asking ChatGPT.", country_name)
         # ask ChatGPT !
-        content = """ISO country code of "%s", nothing else""" % country_name
-        logger.debug('ChatGPT question: %s', content)
-        chat_completion = speedy['openai_client'].chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": content}],
-            temperature=0,
-        )
+        answer = None
+        if speedy.get('openai_client'):
+            content = """ISO country code of "%s", nothing else""" % country_name
+            logger.debug('ChatGPT question: %s', content)
+            try:
+                chat_completion = speedy['openai_client'].chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": content}],
+                    temperature=0,
+                )
+                tokens = chat_completion.usage.total_tokens
+                logger.debug("%d tokens have been used", tokens)
+                speedy["openai_tokens"] += tokens
+                answer = chat_completion.choices[0].message.content
+            except Exception as e:
+                error = """
+                    Error when asking this to Chatgpt: %s\n
+                    It answered: %s
+                """ % (content, traceback.format_exc())
+                logger.warning(error)
+                speedy['logs'][model].append(dict(log, msg=error, reset=True))
 
-        # print the chat completion
-        tokens = chat_completion.usage.total_tokens
-        logger.debug("%d tokens have been used", tokens)
-        speedy["openai_tokens"] += tokens
-        answer = chat_completion.choices[0].message.content
-        if answer:
-            answer = answer.strip()
-            logger.info('ChatGPT answer: %s', answer)
-            if len(answer) == 2:
-                country_code = answer.upper()
-                if country_code in cyd['code2id']:
-                    logger.info("ChatGPT matched country '%s' to %s (%s)", country_name, cyd['code2name'][country_code], country_code)
-                    speedy['logs'][model].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which matched to '%s'" % (country_code, cyd['code2name'][country_code])))
-                    country_id = cyd['code2id'][country_code]
-                    cyd['name2code'][country_name_match] = country_code
-                    return country_id
+            # print the chat completion
+            if answer:
+                answer = answer.strip()
+                logger.info('ChatGPT answer: %s', answer)
+                if len(answer) == 2:
+                    country_code = answer.upper()
+                    if country_code in cyd['code2id']:
+                        logger.info("ChatGPT matched country '%s' to %s (%s)", country_name, cyd['code2name'][country_code], country_code)
+                        speedy['logs'][model].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which matched to '%s'" % (country_code, cyd['code2name'][country_code])))
+                        country_id = cyd['code2id'][country_code]
+                        cyd['name2code'][country_name_match] = country_code
+                        return country_id
+                    else:
+                        speedy['logs'][model].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which didn't match to any country" % country_code), reset=True)
                 else:
-                    speedy['logs'][model].append(dict(log, msg="Country name could not be found in Odoo. ChatGPT said ISO code was '%s', which didn't match to any country" % country_code), reset=True)
+                    speedy['logs'][model].append(
+                        dict(log, msg="ChatGPT didn't answer a 2 letter country code but '%s'" % answer, reset=True))
             else:
-                speedy['logs'][model].append(
-                    dict(log, msg="ChatGPT didn't answer a 2 letter country code but '%s'" % answer, reset=True))
-        else:
-            logger.warning('No answer from chatGPT')
-            speedy['logs'][model].append(dict(log, msg='No answer from chatGPT', reset=True))
+                logger.warning('No answer from chatGPT')
+                speedy['logs'][model].append(dict(log, msg='No answer from chatGPT', reset=True))
         return False
 
     def _field_label(self, field, speedy):

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Copyright 2017-2019 Akretion France
+  @author: Alexis de Lattre <alexis.delattre@akretion.com>
+  License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+-->
+<odoo>
+    <record id="import_helper_form" model="ir.ui.view">
+        <field name="name">import.helper.product</field>
+        <field name="model">import.helper</field>
+        <field name="inherit_id" ref="import_helper_base.import_helper_form" />
+
+        <field name="arch" type="xml">
+            <group name="main" position="after">
+                <group name="variant" string="Variant import options">
+                    Ignore below fields if the import file has no variant columns. 
+                    <field name="variant_creation_mode" />
+                    <field name="variant_price_mode" />
+                </group>
+            </group>
+        </field>
+    </record>
+
+    <record id="product_import_helper_wizard_action" model="ir.actions.act_window">
+        <field name="name">Product Import</field>
+        <field name="res_model">import.helper</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{
+            'template_path': '/product_import_helper/static/xls/product_import_helper_template.xlsx',
+            'hide_ai': 1,
+        }</field>
+    </record>
+    <menuitem
+        id="product_import_helper_menu"
+        parent="import_helper_base.import_helper_parent_menu"
+        action="product_import_helper_wizard_action"
+    />
+</odoo>
