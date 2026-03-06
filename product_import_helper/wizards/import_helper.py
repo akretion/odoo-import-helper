@@ -177,6 +177,7 @@ class ImportHelper(models.TransientModel):
             logger.warning('Product on line %s skipped', vals.get('line'))
             return False
         
+        self = self.with_context(mail_create_nosubscribe=True)
         rvals, product = self._create_product_variant(rvals, speedy)
         if product:
             product.write(rvals)
