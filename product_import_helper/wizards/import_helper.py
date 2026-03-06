@@ -319,6 +319,7 @@ class ImportHelper(models.TransientModel):
         if vals.get('categ_name'):
             categ_id = speedy['categ_name2id'].get(vals['categ_name']) or speedy['categ_code2id'].get(vals['categ_name'])
             if not categ_id:
+                self = self.with_context(mail_create_nosubscribe=True)
                 categ_id = self.env['product.category'].create(self._prepare_product_category(vals, speedy)).id
                 speedy['categ_name2id'][vals['categ_name']] = categ_id
                 logger.info('New category of product created: name "%s", ID %d', vals['categ_name'], categ_id)
