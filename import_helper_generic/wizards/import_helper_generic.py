@@ -273,7 +273,7 @@ class ImportHelpergeneric(models.TransientModel):
                     else:
                         colonnes.append("empty")
                 continue
-            if row:
+            if row[0]:
                 line += 1
                 count += 1
                 vals["line"] = line
@@ -548,7 +548,6 @@ class ImportHelpergeneric(models.TransientModel):
                                                     }
                                                 )
                                             ]
-                                    record.default_code = ref_product
                                 logger.info(f"Update {record.name} {record.id} Ok")
                                 continue
                             else:
@@ -582,6 +581,8 @@ class ImportHelpergeneric(models.TransientModel):
                             logger.warning("Product on line %s skipped", line)
                             continue
                         p_tmpl = self.env["product.template"].create(vals)
+                        if vals.get("default_code"):
+                            p_tmpl.default_code = vals["default_code"]
                         speedy_product_template_list[p_tmpl.default_code] = p_tmpl.id
                         list_product_create[p_tmpl.id] = p_tmpl
                         if p_tmpl and variant_att:
@@ -596,7 +597,6 @@ class ImportHelpergeneric(models.TransientModel):
                                     )
                                 ]
                                 logger.info(f"product variant for {att} create")
-                            p_tmpl.default_code = vals["default_code"]
                             logger.info(
                                 f"{p_tmpl.id} has been create with {len(p_tmpl.attribute_line_ids)} variant"
                             )
@@ -619,10 +619,10 @@ class ImportHelpergeneric(models.TransientModel):
                     )
             else:
                 break
-        for t in speedy_product_template_list:
-            record = self.env["product.template"].browse(
-                speedy_product_template_list[t]
-            )
-            record.default_code = t
+        # for t in speedy_product_template_list:
+        #     record = self.env["product.template"].browse(
+        #         speedy_product_template_list[t]
+        #     )
+        #     record.default_code = t
         action = import_obj._result_action(speedy)
         return action

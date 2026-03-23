@@ -17,3 +17,10 @@ class ProductTemplate(models.Model):
         for record in self:
             if record.default_code:
                 record.default_code_import = record.default_code
+
+    @api.depends("product_variant_ids.default_code")
+    def _compute_default_code(self):
+        for template in self:
+            template._compute_template_field_from_variant_field(
+                "default_code", template.default_code_import
+            )
