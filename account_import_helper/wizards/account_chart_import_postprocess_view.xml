@@ -44,7 +44,7 @@
 
 <menuitem
         id="account_chart_import_postprocess_menu"
-        parent="account_chart_tools_parent_menu"
+        parent="account_chart_import_menu"
         action="account_chart_import_postprocess_action"
         sequence="20"
     />
