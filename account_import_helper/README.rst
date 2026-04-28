@@ -8,7 +8,7 @@ This module has been fully re-written on december 30th 2025 ; if you were used t
 
 In the production database, install this module **account_import_helper** before go-live. As you are before go-live, there should be no journal items in the database.
 
-In developer mode, go to the menu **Settings > Technical > Tools for Chart of Accounts > Import Chart of Accounts** : it will start a wizard to import a custom chart of account from an XLSX file. The XLSX file should contain 2 columns with an optional third column:
+In developer mode, go to the menu **Invoicing > Configuration > Tools for Chart of Accounts > Import Chart of Accounts** : it will start a wizard to import a custom chart of account from an XLSX file. The XLSX file should contain 2 columns with an optional third column:
 
 - column A: the account code (required)
 - column B: the label of the account (required)
@@ -20,7 +20,7 @@ If you select several companies in the *Companies* field of the wizard, Odoo wil
 
 Once the chart of account has been imported, check that the imported accounts are ok. Check that you have one and only one account with type *Current Year Earnings*.
 
-Go to the menu **Settings > Technical > Tools for Chart of Accounts > Re-configure after Chart of Account Import**: it starts a wizard that make it easy to re-configure the default accounts for partners and product categories, and also the suspense account for bank/cash journals and the transfer account of the company.
+Go to the menu **Invoicing > Configuration > Tools for Chart of Accounts > Re-configure after Chart of Account Import**: it starts a wizard that make it easy to re-configure the default accounts for partners and product categories, and also the suspense account for bank/cash journals and the transfer account of the company.
 
 Eventually:
 

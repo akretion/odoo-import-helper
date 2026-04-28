@@ -55,10 +55,16 @@
     <field name="target">new</field>
 </record>
 
+<menuitem
+        id="account_chart_tools_parent_menu"
+        parent="account.menu_finance_configuration"
+        name="Tools for Chart of Accounts"
+        sequence="1"
+    />
 
 <menuitem
         id="account_chart_import_menu"
-        parent="import_helper_base.import_helper_parent_menu"
+        parent="account_chart_tools_parent_menu"
         action="account_chart_import_action"
     />
 
