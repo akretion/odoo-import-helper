@@ -100,7 +100,8 @@ class ImportHelper(models.TransientModel):
         categ_code = hasattr(Category, 'code')
         for categ in Category.search_read([], ['name'] + (['code'] if categ_code else [])):
             speedy['categ_name2id'][categ['name']] = categ['id']
-            speedy['categ_code2id'][categ['code']] = categ['id']
+            if "code" in categ:
+                speedy['categ_code2id'][categ['code']] = categ['id']
         
         # pos category
         if speedy['pos']:
