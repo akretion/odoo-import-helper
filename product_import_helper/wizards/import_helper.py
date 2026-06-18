@@ -97,10 +97,11 @@ class ImportHelper(models.TransientModel):
         
         # category
         Category = self.env['product.category'].with_context(active_test=False)
-        categ_code = hasattr(Category, 'code')
-        for categ in Category.search_read([], ['name'] + (['code'] if categ_code else [])):
+        has_categ_code = hasattr(Category, 'code')
+        for categ in Category.search_read([], ['name'] + (['code'] if has_categ_code else [])):
             speedy['categ_name2id'][categ['name']] = categ['id']
-            speedy['categ_code2id'][categ['code']] = categ['id']
+            if has_categ_code:
+                speedy['categ_code2id'][categ['code']] = categ['id']
         
         # pos category
         if speedy['pos']:
