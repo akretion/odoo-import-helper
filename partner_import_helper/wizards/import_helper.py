@@ -248,8 +248,9 @@ class ImportHelper(models.TransientModel):
             vals['street'] = vals['street2']
             vals['street2'] = False
         # COUNTRY
-        country_id = country_code = False
-        if vals.get('country_name') and isinstance(vals['country_name'], str) and not vals.get('country_id'):
+        country_id = vals.get('country_id')
+        country_code = False
+        if vals.get('country_name') and isinstance(vals['country_name'], str) and not country_id:
             country_id = self._match_country(
                 vals, "country_name", "res.partner", "country_id", speedy)
             # Warning: country_id can be False
