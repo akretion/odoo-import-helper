@@ -38,12 +38,12 @@ class AccountChartImportPostprocess(models.TransientModel):
     product_categ_income_account_id = fields.Many2one(
         'account.account',
         string='Product Category Income Account', required=True, check_company=True,
-        domain="[('deprecated', '=', False), ('account_type', '=', 'income'), ('company_ids', 'in', company_id)]")
+        domain="[('deprecated', '=', False), ('account_type', 'in', ('income', 'income_other')), ('company_ids', 'in', company_id)]")
     # target field: property_account_income_categ_id
     product_categ_expense_account_id = fields.Many2one(
         'account.account',
         string='Product Category Expense Account', required=True, check_company=True,
-        domain="[('deprecated', '=', False), ('account_type', '=', 'expense'), ('company_ids', 'in', company_id)]")
+        domain="[('deprecated', '=', False), ('account_type', 'in', ('expense', 'expense_depreciation', 'expense_direct_cost')), ('company_ids', 'in', company_id)]")
     # target field: property_account_expense_categ_id
     partner_receivable_account_default_id = fields.Many2one(
         'ir.default', readonly=True)
