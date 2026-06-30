@@ -25,7 +25,7 @@
                 </group>
                 <footer>
                     <button string="Import" type="object" name="button_import_file" class="btn btn-primary" />
-                    <button string="Discard" class="btn-secondary" special="cancel" />
+                    <button string="Close" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
         </field>
