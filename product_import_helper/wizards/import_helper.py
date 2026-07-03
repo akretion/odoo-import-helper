@@ -418,8 +418,8 @@ class ImportHelper(models.TransientModel):
                 vals['origin_country_id'] = origin_country_id
             hs_code_code = vals.get('hs_code_code')
             if hs_code_code:
-                if hs_code_code in speedy['hs_code2id']:
-                    vals['hs_code_id'] = speedy['hs_code2id'][hs_code_code]
+                if str(hs_code_code) in speedy['hs_code2id']:
+                    vals['hs_code_id'] = speedy['hs_code2id'][str(hs_code_code)]
                 else:
                     speedy['logs']['product.product'].append({
                         'msg': 'HS code is not in Odoo',
@@ -493,7 +493,7 @@ class ImportHelper(models.TransientModel):
                 speedy['attribute_values'][attribute_id]['name2id'][value] = value_id
             
             attributes[attribute_id] = value_id
-        
+
         if attributes:
             if (
                 any(x in rvals for x in ["list_price", "lst_price"]) and
