@@ -495,7 +495,10 @@ class ImportHelper(models.TransientModel):
             attributes[attribute_id] = value_id
         
         if attributes:
-            if 'list_price' in rvals and self.variant_price_mode != 'fix':
+            if (
+                any(x in rvals for x in ["list_price", "lst_price"]) and
+                self.variant_price_mode != 'fix'
+            ):
                 raise UserError(_(
                     "To set the sale price on the variant, install the OCA module `product_variant_sale_price` "
                     "and choose 'Fix' option for 'Variant price mode'."
