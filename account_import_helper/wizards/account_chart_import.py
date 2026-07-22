@@ -188,12 +188,23 @@ class AccountChartImport(models.TransientModel):
             odoo_chart_file = file_open(odoo_chart_csv_path)
         except FileNotFoundError:
             raise UserError(self.env._("Cannot find file '%(path)s'. Make sure the module %(module)s is available in Odoo server's addons_path.", path=odoo_chart_csv_path, module=self.source_module))
+        bool_map = {
+            'true': True,
+            'false': False,
+            }
         for row in csv.DictReader(odoo_chart_file):
             # taxes_xmlids = [taxtemplate2xmlid[tax.id] for tax in account.tax_ids]
+            non_trade = row['non_trade'] and row['non_trade'].strip().lower() or False
+            if non_trade:
+                non_trade = bool_map.get(non_trade)
+            reconcile = row['reconcile'] and row['reconcile'].strip().lower() or False
+            if reconcile:
+                reconcile = bool_map.get(reconcile)
+
             odoo_chart[row['code']] = {
-                "reconcile": row['reconcile'],
+                "reconcile": reconcile,
                 "account_type": row['account_type'],
-                "non_trade": row['non_trade'],
+                "non_trade": non_trade,
                 # "tax_xmlids": ",".join(taxes_xmlids),
             }
             if not odoo_code_size:
