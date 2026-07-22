@@ -54,7 +54,7 @@ class AccountChartImport(models.TransientModel):
         """This method is designed to be inherited"""
         vals_list_final = []
         for vals in vals_list:
-            vals_list_final.append(dict(vals, company_ids=[Command.set(self.company_ids.ids)]))
+            vals_list_final.append(dict(vals, company_ids=[Command.set([self.company_ids[0].id])]))
         return vals_list_final
 
     def _prepare_equity_unaffected_account(self, equity_unaffected_companies, custom_code_size):
@@ -115,7 +115,18 @@ class AccountChartImport(models.TransientModel):
         # pprint(custom_chart)
         vals_list, custom_code_size = self._generate_custom_chart(custom_chart)
         vals_list_final = self._prepare_accounts(vals_list)
-        accounts = self.env['account.account'].sudo().create(vals_list_final)
+        first_company_id = self.company_ids[0].id
+        accounts = self.env['account.account'].sudo().with_company(first_company_id).create(vals_list_final)
+        logger.info(f"{len(accounts)} accounts created in company ID {first_company_id}")
+        if len(self.company_ids) > 1:
+            for company in self.company_ids[1:]:
+                logger.info(f"Adding accounts in company ID {company.id} with the same code")
+                for account in accounts:
+                    account.with_company(company.id).sudo().write(
+                        {
+                            'company_ids': [Command.link(company.id)],
+                            'code': account.with_company(first_company_id).code,
+                        })
         if self.create_unaffected_earnings_account:
             equity_unaffected_companies = self.env['res.company']
             for company in self.company_ids:
