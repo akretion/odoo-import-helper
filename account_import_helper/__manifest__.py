@@ -1,10 +1,10 @@
-# Copyright 2016-2022 Akretion (http://www.akretion.com)
+# Copyright 2016-2026 Akretion (https://www.akretion.com)
 # @author Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 {
     "name": "Account Import Helper",
-    "version": "18.0.1.0.0",
+    "version": "20.0.1.0.0",
     "category": "Partner",
     "license": "AGPL-3",
     "summary": "Helper methods to import accounting-related data",
@@ -13,7 +13,7 @@
     "depends": ["account"],
     "external_dependencies": {"python": ["openpyxl"]},
     "data": [
-        "security/ir.model.access.csv",
+        "security/ir.access.csv",
         "wizards/account_chart_import_view.xml",
         "wizards/account_chart_import_postprocess_view.xml",
     ],

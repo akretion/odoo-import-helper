@@ -1,11 +1,10 @@
-# Copyright 2017-2022 Akretion France
+# Copyright 2017-2026 Akretion France (https://www.akretion.com/)
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 from odoo import fields, models, Command
 from odoo.tools import file_open
 from odoo.exceptions import UserError
-import base64
 import logging
 from io import BytesIO
 import csv
@@ -75,7 +74,7 @@ class AccountChartImport(models.TransientModel):
             raise UserError(self.env._("The Sheet Number must be strictly positive."))
         self._delete_existing_accounts()
         fileobj = BytesIO()
-        file_bytes = base64.b64decode(self.input_file)
+        file_bytes = self.input_file.content
         fileobj.write(file_bytes)
         fileobj.seek(0)
         try:

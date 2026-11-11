@@ -1,4 +1,4 @@
-# Copyright 2022 Akretion France
+# Copyright 2022-2026 Akretion France (https://www.akretion.com/)
 # @author: Alexis de Lattre <alexis.delattre@akretion.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
@@ -28,22 +28,22 @@ class AccountChartImportPostprocess(models.TransientModel):
     partner_receivable_account_id = fields.Many2one(
         'account.account',
         string='Partner Account Receivable', required=True, check_company=True,
-        domain="[('account_type', '=', 'asset_receivable'), ('deprecated', '=', False), ('company_ids', 'in', company_id)]")
+        domain="[('account_type', '=', 'asset_receivable'), ('company_ids', 'in', company_id)]")
     # target field: property_account_receivable_id
     partner_payable_account_id = fields.Many2one(
         'account.account',
         string='Partner Payable Account', required=True, check_company=True,
-        domain="[('account_type', '=', 'liability_payable'), ('deprecated', '=', False), ('company_ids', 'in', company_id)]")
+        domain="[('account_type', '=', 'liability_payable'), ('company_ids', 'in', company_id)]")
     # target field: property_account_payable_id
     product_categ_income_account_id = fields.Many2one(
         'account.account',
         string='Product Category Income Account', required=True, check_company=True,
-        domain="[('deprecated', '=', False), ('account_type', 'in', ('income', 'income_other')), ('company_ids', 'in', company_id)]")
+        domain="[('account_type', 'in', ('income', 'income_other')), ('company_ids', 'in', company_id)]")
     # target field: property_account_income_categ_id
     product_categ_expense_account_id = fields.Many2one(
         'account.account',
         string='Product Category Expense Account', required=True, check_company=True,
-        domain="[('deprecated', '=', False), ('account_type', 'in', ('expense', 'expense_depreciation', 'expense_direct_cost')), ('company_ids', 'in', company_id)]")
+        domain="[('account_type', 'in', ('expense', 'expense_depreciation', 'expense_direct_cost')), ('company_ids', 'in', company_id)]")
     # target field: property_account_expense_categ_id
     partner_receivable_account_default_id = fields.Many2one(
         'ir.default', readonly=True)
@@ -55,11 +55,11 @@ class AccountChartImportPostprocess(models.TransientModel):
         'ir.default', readonly=True)
     suspense_account_id = fields.Many2one(
         "account.account", string='Suspense Account of Bank/Cash Journals', check_company=True,
-        domain="[('deprecated', '=', False), ('account_type', 'in', ('asset_current', 'liability_current')), ('company_ids', 'in', company_id)]",
+        domain="[('account_type', 'in', ('asset_current', 'liability_current')), ('company_ids', 'in', company_id)]",
         )
     transfer_account_id = fields.Many2one(
         'account.account', string="Inter-Banks Transfer Account", check_company=True,
-        domain="[('reconcile', '=', True), ('account_type', '=', 'asset_current'), ('deprecated', '=', False), ('company_ids', 'in', company_id)]",
+        domain="[('reconcile', '=', True), ('account_type', '=', 'asset_current'), ('company_ids', 'in', company_id)]",
         )
 
     @api.model
