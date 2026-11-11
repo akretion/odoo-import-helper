@@ -18,5 +18,5 @@
     ],
     'data': ['wizards/import_helper_wizard.xml',],
     "external_dependencies": {"python" : ["email-validator",]},
-    'installable': True,
+    'installable': False,
 }
