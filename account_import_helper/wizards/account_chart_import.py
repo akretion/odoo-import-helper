@@ -26,7 +26,7 @@ class AccountChartImport(models.TransientModel):
     source_module = fields.Selection([
         ('l10n_fr_account', 'l10n_fr_account'),
         ('l10n_fr_account_oca', 'l10n_fr_account_oca'),
-        ], default='l10n_fr_account_oca', required=True)
+        ], default='l10n_fr_account', required=True)
     input_file = fields.Binary(required=True, string="XLSX file")
     input_filename = fields.Char()
     input_start_line = fields.Integer(string="Start Line", default=2, required=True)
@@ -115,7 +115,7 @@ class AccountChartImport(models.TransientModel):
         vals_list, custom_code_size = self._generate_custom_chart(custom_chart)
         vals_list_final = self._prepare_accounts(vals_list)
         first_company_id = self.company_ids[0].id
-        accounts = self.env['account.account'].sudo().with_company(first_company_id).create(vals_list_final)
+        accounts = self.env['account.account'].sudo().with_company(first_company_id).with_context(skip_auto_account_journal_creation=True).create(vals_list_final)
         logger.info(f"{len(accounts)} accounts created in company ID {first_company_id}")
         if len(self.company_ids) > 1:
             for company in self.company_ids[1:]:
@@ -172,7 +172,7 @@ class AccountChartImport(models.TransientModel):
             tax_rep_lines = self.env['account.tax.repartition.line'].sudo().search([('account_id', '!=', False), ('company_id', 'in', company_ids)])
             logger.info('Setting account_id to false on account.tax.repartition.line IDs %s', tax_rep_lines.ids)
             tax_rep_lines.write({'account_id': False})
-            accounts = self.env['account.account'].sudo().search([('company_ids', 'in', company_ids)])
+            accounts = self.env['account.account'].sudo().with_context(active_test=False).search([('company_ids', 'in', company_ids)])
             logger.info('Deleting account.account IDs %s', accounts.ids)
             accounts.unlink()
 
@@ -190,35 +190,36 @@ class AccountChartImport(models.TransientModel):
         odoo_chart = {}
         assert self.source_module in ('l10n_fr_account', 'l10n_fr_account_oca')
         if self.source_module == 'l10n_fr_account':
-            odoo_chart_csv_path = 'addons/l10n_fr_account/data/template/account.account-fr.csv'
+            odoo_chart_csv_paths = ['addons/l10n_fr_account/data/template/account.account-fr.csv', 'addons/l10n_fr_account/data/template/account.account-fr_comp.csv']
         elif self.source_module == 'l10n_fr_account_oca':
-            odoo_chart_csv_path = 'addons/l10n_fr_account_oca/data/template/account.account-fr_oca.csv'
+            odoo_chart_csv_paths = ['addons/l10n_fr_account_oca/data/template/account.account-fr_oca.csv']
         odoo_code_size = False
-        try:
-            odoo_chart_file = file_open(odoo_chart_csv_path)
-        except FileNotFoundError:
-            raise UserError(self.env._("Cannot find file '%(path)s'. Make sure the module %(module)s is available in Odoo server's addons_path.", path=odoo_chart_csv_path, module=self.source_module))
         bool_map = {
             'true': True,
             'false': False,
             }
-        for row in csv.DictReader(odoo_chart_file):
-            # taxes_xmlids = [taxtemplate2xmlid[tax.id] for tax in account.tax_ids]
-            non_trade = row['non_trade'] and row['non_trade'].strip().lower() or False
-            if non_trade:
-                non_trade = bool_map.get(non_trade)
-            reconcile = row['reconcile'] and row['reconcile'].strip().lower() or False
-            if reconcile:
-                reconcile = bool_map.get(reconcile)
+        for odoo_chart_csv_path in odoo_chart_csv_paths:
+            try:
+                odoo_chart_file = file_open(odoo_chart_csv_path)
+            except FileNotFoundError:
+                raise UserError(self.env._("Cannot find file '%(path)s'. Make sure the module %(module)s is available in Odoo server's addons_path.", path=odoo_chart_csv_path, module=self.source_module))
+            for row in csv.DictReader(odoo_chart_file):
+                # taxes_xmlids = [taxtemplate2xmlid[tax.id] for tax in account.tax_ids]
+                non_trade = row['non_trade'] and row['non_trade'].strip().lower() or False
+                if non_trade:
+                    non_trade = bool_map.get(non_trade)
+                reconcile = row['reconcile'] and row['reconcile'].strip().lower() or False
+                if reconcile:
+                    reconcile = bool_map.get(reconcile)
 
-            odoo_chart[row['code']] = {
-                "reconcile": reconcile,
-                "account_type": row['account_type'],
-                "non_trade": non_trade,
-                # "tax_xmlids": ",".join(taxes_xmlids),
-            }
-            if not odoo_code_size:
-                odoo_code_size = len(row['code'])
+                odoo_chart[row['code']] = {
+                    "reconcile": reconcile,
+                    "account_type": row['account_type'],
+                    "non_trade": non_trade,
+                    # "tax_xmlids": ",".join(taxes_xmlids),
+                }
+                if not odoo_code_size:
+                    odoo_code_size = len(row['code'])
         # print('odoo_chart====')
         # pprint(odoo_chart)
         vals_list = []
